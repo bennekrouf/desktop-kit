@@ -1,0 +1,90 @@
+/* The Pro window, in the header's colours: --kit-bar for the window,
+   --kit-line for its edges, --kit-text and --kit-muted for the words and
+   --kit-accent for Buy. */
+.kit-pro-backdrop {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.5);
+}
+.kit-pro-window {
+    position: relative;
+    width: 100%; max-width: 480px; max-height: calc(100vh - 48px); overflow-y: auto;
+    box-sizing: border-box;
+    background: var(--kit-bar, #1a1d24); color: var(--kit-text, #e6e8ec);
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13.5px; line-height: 1.5;
+}
+.kit-pro-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px 0;
+}
+.kit-pro-head h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.kit-pro-body { padding: 10px 18px 18px; }
+.kit-pro-body p { margin: 0 0 10px; }
+.kit-pro-pitch p, .kit-pro-details p { margin: 0 0 10px; }
+.kit-pro-details { color: var(--kit-muted, #8a909c); font-size: 12.5px; }
+.kit-pro-hint { color: var(--kit-muted, #8a909c); font-size: 12.5px; }
+.kit-pro-ok { color: var(--kit-accent, #6ea8fe); }
+.kit-pro-error { color: #e5534b; font-size: 12.5px; }
+.kit-pro-close {
+    padding: 0 4px; margin: 0; border: 0;
+    background: transparent; color: var(--kit-muted, #8a909c);
+    font-size: 22px; line-height: 1; cursor: pointer;
+}
+.kit-pro-close:hover { color: var(--kit-text, #e6e8ec); }
+
+.kit-pro-input {
+    width: 100%; box-sizing: border-box; margin: 0 0 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 6px;
+    background: transparent; color: var(--kit-text, #e6e8ec);
+    font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
+}
+.kit-pro-input:focus { outline: none; border-color: var(--kit-accent, #6ea8fe); }
+.kit-pro-row { display: flex; gap: 8px; align-items: flex-start; }
+.kit-pro-row .kit-pro-input { flex: 1; }
+.kit-pro-free { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--kit-line, #2a2f3a); }
+
+.kit-pro-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 30px; padding: 0 12px; margin: 0;
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 6px;
+    background: transparent; color: var(--kit-text, #e6e8ec);
+    font: inherit; font-size: 12.5px; font-weight: 500; white-space: nowrap;
+    cursor: pointer;
+}
+.kit-pro-btn:hover { background: var(--kit-hover, rgba(255, 255, 255, 0.06)); }
+.kit-pro-btn:disabled { opacity: 0.5; cursor: default; }
+.kit-pro-buy {
+    width: 100%; height: 36px; margin: 4px 0 14px;
+    border-color: var(--kit-accent, #6ea8fe);
+    background: var(--kit-accent, #6ea8fe); color: #fff;
+    font-weight: 600; font-size: 13.5px;
+}
+.kit-pro-buy:hover { background: var(--kit-accent, #6ea8fe); filter: brightness(1.08); }
+.kit-pro-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.kit-pro-gap { flex: 1; }
+
+.kit-pro-done { padding: 28px 24px 22px; text-align: center; }
+.kit-pro-done .kit-pro-close { position: absolute; top: 12px; right: 14px; }
+.kit-pro-mark {
+    width: 48px; height: 48px; margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--kit-accent, #6ea8fe); color: #fff;
+    font-size: 24px; font-weight: 700;
+}
+.kit-pro-done-title { margin: 0 0 4px; font-size: 19px; }
+.kit-pro-done-sub { color: var(--kit-muted, #8a909c); }
+.kit-pro-done .kit-pro-btn { margin-top: 6px; }
+
+.kit-pro-spinner {
+    width: 12px; height: 12px;
+    border: 2px solid var(--kit-line, #2a2f3a); border-top-color: var(--kit-accent, #6ea8fe);
+    border-radius: 50%;
+    animation: kit-pro-spin 0.8s linear infinite;
+}
+@keyframes kit-pro-spin { to { transform: rotate(360deg); } }

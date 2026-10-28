@@ -1,5 +1,6 @@
 //! Which app this is, set once at start-up.
 
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use crate::http;
@@ -20,8 +21,14 @@ pub struct App {
     /// and the person's answer. Usually `id`; an app that was renamed keeps
     /// its old name here, so a "turn it off" given under that name still holds.
     pub telemetry_folder: &'static str,
-    /// One HTTP GET with the app's own client. See [`http::Get`].
-    pub http_get: http::Get,
+    /// The id api0 knows the app by: a plan lists it to make the app Pro. Not
+    /// always `id` (PolishCast is `small-video`).
+    pub product: &'static str,
+    /// Where the app keeps api0's last answer about its licence; `None` for an
+    /// app without one. The number itself is in the file every app shares.
+    pub licence_file: fn() -> Option<PathBuf>,
+    /// One HTTP request with the app's own client. See [`http::Call`].
+    pub http: http::Call,
 }
 
 static APP: OnceLock<App> = OnceLock::new();
