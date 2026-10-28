@@ -1,0 +1,47 @@
+/* The banners under the header, in the app's accent colour. They float over
+   the top of the page rather than push it down, so an app's full-height
+   layout stays the height it was laid out for. */
+.kit-banners {
+    position: fixed; top: var(--kit-header-h, 44px); left: 0; right: 0;
+    z-index: 999;
+    display: flex; flex-direction: column;
+    pointer-events: none;
+}
+.kit-banner {
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 16px;
+    background: var(--kit-accent, #6ea8fe); color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    pointer-events: auto;
+}
+.kit-banner + .kit-banner { border-top: 1px solid rgba(255, 255, 255, 0.25); }
+.kit-banner-text { flex: 1; min-width: 0; }
+.kit-banner-text strong { font-weight: 700; }
+.kit-banner-link {
+    flex-shrink: 0;
+    padding: 4px 10px; margin: 0;
+    border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 5px;
+    background: transparent; color: #fff;
+    font: inherit; font-weight: 600; white-space: nowrap;
+    cursor: pointer;
+}
+.kit-banner-link:hover { background: rgba(255, 255, 255, 0.15); }
+.kit-banner-sha {
+    flex-shrink: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px; opacity: 0.8;
+}
+.kit-banner-close {
+    flex-shrink: 0;
+    padding: 0 4px; margin: 0; border: 0;
+    background: transparent; color: #fff;
+    font-size: 20px; line-height: 1; opacity: 0.7;
+    cursor: pointer;
+}
+.kit-banner-close:hover { opacity: 1; }
+.kit-consent {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
+    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.25);
+}

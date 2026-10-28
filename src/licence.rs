@@ -16,10 +16,18 @@
 //! is typed once per computer.
 //!
 //! Here: the number's format, api0's answer, what a saved answer amounts to at
-//! a given time, and the shared file. The requests, and where an app keeps its
-//! own answer, stay in each app, which uses its own HTTP client. Everything
-//! that depends on the app takes its `product`: the id api0 knows it by, which
+//! a given time, and the shared file. The requests, and the app's own copy of
+//! the last answer, are in [`online`] and re-exported here: they go through
+//! the app's HTTP client and use the [`crate::App`] it named at start-up.
+//! What depends on the app takes its `product`: the id api0 knows it by, which
 //! is not always its name (PolishCast is `small-video`).
+
+mod online;
+
+pub use online::{
+    activate, buy_url, current, deactivate, portal_url, refresh, request_free_credits, status_now,
+    title_badge,
+};
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

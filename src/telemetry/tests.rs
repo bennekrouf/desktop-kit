@@ -32,7 +32,9 @@ const TEST_APP: crate::App = crate::App {
     name: "Desktop Kit",
     version: "0.0.1",
     telemetry_folder: "desktop-kit-test",
-    http_get: test_get,
+    product: "desktop-kit-test",
+    licence_file: || None,
+    http: test_get,
 };
 
 fn named() {

@@ -1,14 +1,14 @@
 [package]
 name = "desktop-kit"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license-file = "LICENSE"
-description = "What every mayorana desktop app shares: usage statistics, the update check, the notice and the licence."
+description = "What every mayorana desktop app shares: usage statistics, the update check, the notice, the licence, and the header, banners and Pro window."
 publish = false
 
 # No HTTP client: each app passes its own HTTP call to `desktop_kit::init`, so
 # this crate never decides between reqwest and ureq, or which TLS stack an app
-# links. The one piece of user interface, the header, is behind `ui`.
+# links. The user interface (header, banners, Pro window) is behind `ui`.
 [dependencies]
 base64 = "0.22"
 dirs = "6"

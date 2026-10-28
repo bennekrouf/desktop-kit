@@ -16,7 +16,9 @@ fn named() {
         name: "Desktop Kit",
         version: "0.0.1",
         telemetry_folder: "desktop-kit-test",
-        http_get: no_get,
+        product: "desktop-kit-test",
+        licence_file: || None,
+        http: no_get,
     });
 }
 
@@ -152,4 +154,122 @@ fn a_licence_status_has_one_look() {
     use crate::licence::Status;
     assert_eq!(ProLook::of(&Status::Free), ProLook::Get);
     assert_eq!(ProLook::of(&Status::Unknown("X".into())), ProLook::Renew);
+}
+
+#[derive(Props, Clone, PartialEq)]
+struct Window {
+    open: bool,
+    status: crate::licence::Status,
+}
+
+#[allow(non_snake_case)]
+fn ProHarness(window: Window) -> Element {
+    let pro = Pro {
+        open: use_signal(|| window.open),
+        status: use_signal(|| window.status.clone()),
+    };
+    rsx! {
+        ProWindow { pro, pitch: rsx! { p { "The free version does one thing." } } }
+    }
+}
+
+fn render_pro(open: bool, status: crate::licence::Status) -> String {
+    named();
+    let mut dom = VirtualDom::new_with_props(ProHarness, Window { open, status });
+    dom.rebuild_in_place();
+    without_style(dioxus_ssr::render(&dom))
+}
+
+/// The page without its stylesheets, whose class names would match too.
+fn without_style(html: String) -> String {
+    let mut out = String::new();
+    let mut rest = html.as_str();
+    while let Some(start) = rest.find("<style>") {
+        out.push_str(&rest[..start]);
+        rest = rest[start..]
+            .split_once("</style>")
+            .map_or("", |(_, after)| after);
+    }
+    out.push_str(rest);
+    out
+}
+
+fn answer(active: bool) -> crate::licence::Answer {
+    crate::licence::Answer {
+        licence: "ABCDE-FGHJK-LMNPQ-RSTUV".into(),
+        email: "dev@example.ch".into(),
+        plan: crate::licence::Plan {
+            id: "pro".into(),
+            name: "Studio".into(),
+        },
+        products: vec!["*".into()],
+        active,
+        period_end: "2026-11-21T10:00:00Z".into(),
+        ..crate::licence::Answer::default()
+    }
+}
+
+#[test]
+fn without_a_licence_the_window_sells_pro_and_asks_for_a_number() {
+    use crate::licence::Status;
+    let html = render_pro(true, Status::Free);
+    assert!(html.contains("Desktop Kit Pro"), "{html}");
+    assert!(html.contains("The free version does one thing."), "{html}");
+    assert!(html.contains("Buy Desktop Kit Pro"), "{html}");
+    assert!(
+        html.contains("ABCDE-FGHJK-LMNPQ-RSTUV") && html.contains(">Activate<"),
+        "{html}"
+    );
+    assert!(html.contains("Get free AI credits"), "{html}");
+    assert!(!html.contains("Remove the licence"), "{html}");
+}
+
+#[test]
+fn a_pro_licence_is_congratulated_with_its_plan() {
+    use crate::licence::Status;
+    let html = render_pro(true, Status::Pro(answer(true)));
+    assert!(html.contains("You&#39;re Pro"), "{html}");
+    assert!(html.contains("Studio plan for dev@example.ch"), "{html}");
+    assert!(html.contains("Manage subscription"), "{html}");
+    assert!(
+        !html.contains(">Activate<") && !html.contains("one thing"),
+        "{html}"
+    );
+}
+
+#[test]
+fn a_lapsed_licence_is_renewed_rather_than_bought() {
+    use crate::licence::Status;
+    let html = render_pro(true, Status::NotPro(answer(false)));
+    assert!(html.contains("Renew Desktop Kit Pro"), "{html}");
+    assert!(html.contains("runs as the free version"), "{html}");
+    assert!(
+        html.contains("Check again") && html.contains("Remove the licence"),
+        "{html}"
+    );
+    assert!(!html.contains(">Activate<"), "{html}");
+}
+
+#[test]
+fn a_closed_window_shows_nothing() {
+    let html = render_pro(false, crate::licence::Status::Free);
+    assert!(!html.contains("kit-pro"), "{html}");
+}
+
+#[allow(non_snake_case)]
+fn BannerHarness() -> Element {
+    rsx! { Banners { statistics: false } }
+}
+
+#[test]
+fn banners_show_nothing_until_there_is_something_to_say() {
+    named();
+    let mut dom = VirtualDom::new(BannerHarness);
+    dom.rebuild_in_place();
+    let html = without_style(dioxus_ssr::render(&dom));
+    assert!(html.contains("kit-banners"), "{html}");
+    assert!(
+        !html.contains("kit-banner\"") && !html.contains("kit-consent"),
+        "{html}"
+    );
 }
