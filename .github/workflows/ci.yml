@@ -54,7 +54,7 @@ jobs:
 
       # --locked fails the run if Cargo.lock has drifted from Cargo.toml.
       - name: Test
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --all-features --locked
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
