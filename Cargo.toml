@@ -1,0 +1,29 @@
+[package]
+name = "desktop-kit"
+version = "0.1.0"
+edition = "2021"
+license-file = "LICENSE"
+description = "What every mayorana desktop app shares: usage statistics, the update check, the notice and the licence."
+publish = false
+
+# No user interface and no HTTP client: each app passes its own HTTP call to
+# `desktop_kit::init`, so this crate never decides between reqwest and ureq,
+# or which TLS stack an app links.
+[dependencies]
+base64 = "0.22"
+dirs = "6"
+getrandom = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "sync", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "net", "io-util", "rt-multi-thread"] }
+
+[lints.clippy]
+# The same lints in every desktop app. A panic is a crash the user sees, so unwrap and expect
+# are refused outside tests, as is unsafe code without a SAFETY comment. Where one is right
+# (a constant that cannot fail), allow it on that item and say why.
+unwrap_used = "deny"
+expect_used = "deny"
+undocumented_unsafe_blocks = "deny"

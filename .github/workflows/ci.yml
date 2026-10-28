@@ -1,0 +1,60 @@
+name: CI
+
+# Fast feedback on every pull request and on main.
+#
+# The desktop apps' CI, less what only an app needs: no GUI packages to
+# install, no release build to check, no .exe to inspect.
+#
+# The apps pin a tag of this repository, so a change reaches an app only when
+# the app moves to the new tag.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push on the same ref cancels the run it superseded.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ── Formatting: blocking ───────────────────────────────────────────────────
+  # No compile, reports in ~20s. .githooks/pre-commit formats what is staged,
+  # so this is a real gate rather than a check that is red forever.
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Installs the version and components rust-toolchain.toml pins.
+      - run: rustup toolchain install
+      - run: cargo fmt --all --check
+
+  # ── Tests + clippy: blocking, on Linux, macOS and Windows ───────────────────
+  # Every app builds this for each of these.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installs the version and components rust-toolchain.toml pins.
+      - run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      # --locked fails the run if Cargo.lock has drifted from Cargo.toml.
+      - name: Test
+        run: cargo test --workspace --locked
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
