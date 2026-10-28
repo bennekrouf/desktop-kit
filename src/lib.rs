@@ -8,18 +8,23 @@
 //! * [`notice`]: the one-line message mayorana.ch can show in every app;
 //! * [`feedback`]: the links back to mayorana.ch;
 //! * [`licence`]: the licence number and api0's answer about it, without the
-//!   network and disk parts, which stay with each app.
+//!   network and disk parts, which stay with each app;
+//! * [`region`]: the AI regions api0 offers, with their flags;
+//! * [`ui`] (with the `ui` feature): the header every app shows.
 //!
-//! There is no user interface here, and no HTTP client: each app calls
-//! [`init`] once at start-up with its name, its version and its own HTTP GET.
-//! Until then, nothing here touches the network or records anything.
+//! There is no HTTP client here: each app calls [`init`] once at start-up with
+//! its name, its version and its own HTTP GET. Until then, nothing here
+//! touches the network or records anything.
 
 mod app;
 pub mod feedback;
 pub mod http;
 pub mod licence;
 pub mod notice;
+pub mod region;
 pub mod telemetry;
+#[cfg(feature = "ui")]
+pub mod ui;
 pub mod update_check;
 
 pub(crate) use app::app;

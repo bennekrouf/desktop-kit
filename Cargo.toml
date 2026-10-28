@@ -1,14 +1,14 @@
 [package]
 name = "desktop-kit"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license-file = "LICENSE"
 description = "What every mayorana desktop app shares: usage statistics, the update check, the notice and the licence."
 publish = false
 
-# No user interface and no HTTP client: each app passes its own HTTP call to
-# `desktop_kit::init`, so this crate never decides between reqwest and ureq,
-# or which TLS stack an app links.
+# No HTTP client: each app passes its own HTTP call to `desktop_kit::init`, so
+# this crate never decides between reqwest and ureq, or which TLS stack an app
+# links. The one piece of user interface, the header, is behind `ui`.
 [dependencies]
 base64 = "0.22"
 dirs = "6"
@@ -16,8 +16,14 @@ getrandom = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt", "sync", "time"] }
+# Only with the `ui` feature: the header every app shows.
+dioxus = { version = "=0.7.10", default-features = false, features = ["macro", "html", "signals", "hooks", "document"], optional = true }
+
+[features]
+ui = ["dep:dioxus"]
 
 [dev-dependencies]
+dioxus-ssr = "=0.7.10"
 tokio = { version = "1", features = ["macros", "net", "io-util", "rt-multi-thread"] }
 
 [lints.clippy]

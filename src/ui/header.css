@@ -1,0 +1,108 @@
+/* The header every mayorana desktop app shows. Colours come from the app:
+   it sets these on `body`, so `body.light` changes them too.
+     --kit-bar     the bar's background
+     --kit-line    its bottom border and the outline of a hovered button
+     --kit-hover   a hovered button's background
+     --kit-text    button text
+     --kit-muted   the version
+     --kit-accent  the app's name and the Get Pro button */
+:root { --kit-header-h: 44px; }
+
+.kit-header {
+    display: flex; align-items: center; gap: 14px;
+    height: var(--kit-header-h); box-sizing: border-box;
+    padding: 0 10px 0 16px;
+    background: var(--kit-bar, #1a1d24);
+    border-bottom: 1px solid var(--kit-line, #2a2f3a);
+    color: var(--kit-text, #e6e8ec);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1;
+    flex-shrink: 0;
+    /* Sticky, for an app whose page scrolls rather than a pane inside it. */
+    position: sticky; top: 0; z-index: 30;
+    user-select: none; -webkit-user-select: none;
+}
+
+.kit-brand { display: flex; align-items: baseline; gap: 7px; flex-shrink: 0; }
+.kit-name { font-size: 14px; font-weight: 700; letter-spacing: -0.2px; color: var(--kit-accent, #6ea8fe); }
+.kit-version { font-size: 11px; color: var(--kit-muted, #8a909c); font-variant-numeric: tabular-nums; }
+
+/* The app's own content: tabs, a picker, a path. It takes what is left and
+   never pushes the right-hand buttons off the bar. */
+.kit-middle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; overflow: hidden; }
+
+.kit-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.kit-header .kit-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    height: 28px; box-sizing: border-box; padding: 0 10px; margin: 0;
+    border: 1px solid transparent; border-radius: 6px;
+    background: transparent; color: var(--kit-text, #e6e8ec);
+    font: inherit; font-size: 12.5px; font-weight: 500;
+    white-space: nowrap; text-decoration: none;
+    cursor: pointer;
+}
+.kit-header .kit-btn:hover { background: var(--kit-hover, rgba(255, 255, 255, 0.06)); border-color: var(--kit-line, #2a2f3a); }
+.kit-header .kit-btn:disabled { opacity: 0.5; cursor: default; }
+.kit-header .kit-btn:disabled:hover { background: transparent; border-color: transparent; }
+/* For an app's button that is switched on, e.g. GitAgent's Trust all. */
+.kit-header .kit-btn.kit-on { color: var(--kit-accent, #6ea8fe); border-color: var(--kit-accent, #6ea8fe); }
+
+/* Tabs in the middle, e.g. PublishKit's Blog / Board / Calendar. */
+.kit-tabs { display: flex; align-items: center; gap: 2px; }
+.kit-header .kit-tab {
+    height: 28px; padding: 0 11px; border: 0; border-radius: 6px;
+    background: transparent; color: var(--kit-muted, #8a909c);
+    font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.kit-header .kit-tab:hover { color: var(--kit-text, #e6e8ec); background: var(--kit-hover, rgba(255, 255, 255, 0.06)); }
+.kit-header .kit-tab.kit-on { color: var(--kit-text, #e6e8ec); background: var(--kit-hover, rgba(255, 255, 255, 0.06)); box-shadow: inset 0 -2px 0 var(--kit-accent, #6ea8fe); }
+/* A path or other detail beside the tabs. */
+.kit-detail { font-size: 11.5px; color: var(--kit-muted, #8a909c); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+.kit-header .kit-model { border-color: var(--kit-line, #2a2f3a); gap: 7px; }
+.kit-header .kit-flag { width: 18px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+
+.kit-header .kit-icon { width: 30px; padding: 0; }
+.kit-header .kit-icon svg {
+    width: 16px; height: 16px;
+    fill: none; stroke: currentColor; stroke-width: 1.75;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+
+.kit-header .kit-get-pro { color: var(--kit-accent, #6ea8fe); border-color: var(--kit-accent, #6ea8fe); margin-left: 4px; }
+
+.kit-pro {
+    --pro-a: var(--kit-accent, #6ea8fe);
+    --pro-b: #e0b342;
+    position: relative; overflow: hidden;
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 28px; box-sizing: border-box; padding: 0 13px 0 11px; margin: 0 0 0 4px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--pro-b) 55%, var(--pro-a));
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--pro-a) 20%, transparent),
+        color-mix(in srgb, var(--pro-b) 22%, transparent));
+    color: var(--kit-text, #e6e8ec);
+    font: inherit; font-size: 11.5px; font-weight: 800; letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+.kit-pro-star { color: var(--pro-b); font-size: 12px; letter-spacing: 0; }
+.kit-pro .kit-pro-text {
+    background: linear-gradient(90deg, var(--pro-a), var(--pro-b));
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+}
+/* A single sweep of light on hover: enough to feel alive, not a banner. */
+.kit-pro::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+    background: linear-gradient(100deg, transparent, color-mix(in srgb, #fff 35%, transparent), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.6s ease;
+    pointer-events: none;
+}
+.kit-pro:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--pro-b) 22%, transparent); }
+.kit-pro:hover::after { left: 120%; }
+.kit-pro-renew { --pro-a: #e08a4a; --pro-b: #e0b342; }
