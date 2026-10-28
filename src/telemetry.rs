@@ -171,6 +171,7 @@ fn login_env(name: &str) -> Option<String> {
 /// `KEY=value` lines from the shell, keeping only the opt-out variables. A
 /// profile that prints its own output (nvm, conda, banners) cannot smuggle
 /// anything else in, because only these names are accepted.
+#[cfg(any(unix, test))]
 fn parse_login_env(text: &str) -> BTreeMap<String, String> {
     text.lines()
         .filter_map(|line| line.split_once('='))
