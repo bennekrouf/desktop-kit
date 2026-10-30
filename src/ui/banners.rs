@@ -2,7 +2,8 @@
 //! from mayorana.ch and, once, the usage-statistics notice.
 //!
 //! Each looks for itself a few seconds after start-up, so neither slows a cold
-//! start, and says nothing when it finds nothing or can't ask.
+//! start, and says nothing when it finds nothing or can't ask. The update
+//! check looks again once a day while the app stays open.
 
 use std::time::Duration;
 
@@ -36,16 +37,29 @@ pub fn Banners(
     let mut notice = use_signal(|| Option::<Notice>::None);
     let mut ask = use_signal(|| false);
 
+    // At start-up, then once a day for as long as the app stays open: a
+    // release published while it runs would otherwise wait for the next
+    // launch, which for an app left open for days is no notice at all.
     use_future(move || async move {
         tokio::time::sleep(Duration::from_secs(3)).await;
-        if let Some(info) = update_check::check().await {
-            let to = info.latest_version.clone();
-            match on_update_offered {
-                Some(offered) => offered.call(to),
-                None if statistics => telemetry::record(Event::UpdateOffered { to }),
-                None => {}
+        // Each version is offered once per launch, so a banner the person
+        // hid stays hidden until a newer release, and the statistics count
+        // one offer, not one a day.
+        let mut offered = None::<String>;
+        loop {
+            if let Some(info) = update_check::check().await {
+                if offered.as_deref() != Some(info.latest_version.as_str()) {
+                    let to = info.latest_version.clone();
+                    offered = Some(to.clone());
+                    match on_update_offered {
+                        Some(offered) => offered.call(to),
+                        None if statistics => telemetry::record(Event::UpdateOffered { to }),
+                        None => {}
+                    }
+                    update.set(Some(info));
+                }
             }
-            update.set(Some(info));
+            wait_a_day().await;
         }
     });
     use_future(move || async move {
@@ -167,6 +181,23 @@ pub fn Banners(
                     "Turn off"
                 }
             }
+        }
+    }
+}
+
+/// Returns once a day of wall-clock time has passed. Measured against the
+/// clock, an hour at a time, rather than with one long sleep: tokio's timer
+/// stops while the computer sleeps, so a 24-hour sleep on a laptop closed
+/// every night could take a week.
+async fn wait_a_day() {
+    const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+    let since = std::time::SystemTime::now();
+    loop {
+        tokio::time::sleep(Duration::from_secs(60 * 60)).await;
+        // A clock set back counts as a day gone, rather than as a wait that
+        // never ends.
+        if since.elapsed().map_or(true, |waited| waited >= DAY) {
+            return;
         }
     }
 }
