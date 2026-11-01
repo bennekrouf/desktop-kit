@@ -68,6 +68,7 @@
 
 /* One colour per status, everywhere. */
 .kit-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--kit-status); }
+.kit-status-planned { --kit-status: #5fb3b3; }
 .kit-status-recording { --kit-status: #e5534b; }
 .kit-status-polishing { --kit-status: #e5a050; }
 .kit-status-ready { --kit-status: #57ab5a; }
@@ -100,3 +101,14 @@
 }
 .kit-cal-item:hover { filter: brightness(1.2); }
 .kit-cal-time { color: var(--kit-muted, #8a909c); margin-right: 4px; font-variant-numeric: tabular-nums; }
+
+.kit-lib-plan { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; padding: 10px 12px; border: 1px dashed var(--kit-line, #2a2f3a); border-radius: 8px; }
+.kit-lib-notes-input {
+    flex-basis: 100%; min-height: 60px; box-sizing: border-box; padding: 6px 8px;
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 6px;
+    background: var(--kit-bar, #1a1d24); color: inherit; font: inherit; font-size: 12.5px; resize: vertical;
+}
+.kit-lib-notes {
+    margin: 0; color: var(--kit-muted, #8a909c); font-size: 12px; white-space: pre-wrap;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}

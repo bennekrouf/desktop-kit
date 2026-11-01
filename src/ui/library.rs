@@ -48,6 +48,10 @@ pub fn open_in(
 /// What a click on an item opens: its place in the app that made it, or, for a file dropped in
 /// by hand, the file itself.
 fn open_item(here: &str, item: &Item, on_open: &EventHandler<String>) -> Result<(), String> {
+    if item.status == Status::Planned && item.files.is_empty() {
+        // Nothing made yet: its notes are on the row.
+        return Ok(());
+    }
     if item.app == "library" || item.open.is_empty() {
         return match item.main_file() {
             Some(f) => launch::open_file(&f.path),
@@ -84,7 +88,7 @@ impl Shown {
 
     fn label(self) -> &'static str {
         match self {
-            Shown::Media => "Recordings and pictures",
+            Shown::Media => "Recordings, pictures, ideas",
             Shown::Everything => "Everything, posts too",
             Shown::Only(k) => k.label(),
         }
@@ -97,11 +101,15 @@ impl Shown {
             .unwrap_or(Shown::Media)
     }
 
-    fn shows(self, kind: Kind) -> bool {
+    /// Planned ideas show with the media, whatever they will be.
+    fn shows(self, item: &Item) -> bool {
         match self {
-            Shown::Media => matches!(kind, Kind::Video | Kind::Audio | Kind::Image),
+            Shown::Media => {
+                matches!(item.kind, Kind::Video | Kind::Audio | Kind::Image)
+                    || item.status == Status::Planned
+            }
             Shown::Everything => true,
-            Shown::Only(k) => k == kind,
+            Shown::Only(k) => k == item.kind,
         }
     }
 }
@@ -150,12 +158,14 @@ pub fn LibraryView(
     let mut status = use_signal(|| None::<Status>);
     let mut error = use_signal(|| None::<String>);
     let mut over = use_signal(|| false);
+    // The "plan an idea" form, while it is open: title, day, kind, notes.
+    let mut planning = use_signal(|| None::<(String, String, Kind, String)>);
 
     let mut report = move |r: Result<(), String>| error.set(r.err());
     let shown: Vec<Item> = items
         .read()
         .iter()
-        .filter(|i| kind().shows(i.kind))
+        .filter(|i| kind().shows(i))
         .filter(|i| status().is_none_or(|s| i.status == s))
         .filter(|i| i.matches(&query()))
         .cloned()
@@ -217,6 +227,77 @@ pub fn LibraryView(
                     }
                 }
                 span { class: "kit-lib-count", "{shown.len()} of {total}" }
+                button {
+                    class: "kit-chip",
+                    title: "Put a video, audio or post you mean to make on the calendar",
+                    onclick: move |_| {
+                        let next = if planning.peek().is_some() { None } else { Some((String::new(), library::today(), Kind::Video, String::new())) };
+                        planning.set(next);
+                    },
+                    "Plan…"
+                }
+            }
+            if let Some((title, day, plan_kind, notes)) = planning() {
+                div { class: "kit-lib-plan",
+                    input {
+                        class: "kit-lib-search",
+                        r#type: "text",
+                        placeholder: "What you'll make",
+                        value: "{title}",
+                        oninput: move |e| {
+                            if let Some(p) = planning.write().as_mut() {
+                                p.0 = e.value();
+                            }
+                        },
+                    }
+                    input {
+                        class: "kit-lib-select",
+                        r#type: "date",
+                        value: "{day}",
+                        oninput: move |e| {
+                            if let Some(p) = planning.write().as_mut() {
+                                p.1 = e.value();
+                            }
+                        },
+                    }
+                    select {
+                        class: "kit-lib-select",
+                        onchange: move |e| {
+                            if let Some(p) = planning.write().as_mut() {
+                                p.2 = Kind::ALL.into_iter().find(|k| format!("{k:?}") == e.value()).unwrap_or(Kind::Video);
+                            }
+                        },
+                        for k in [Kind::Video, Kind::Audio, Kind::Blog, Kind::Social] {
+                            option { value: "{k:?}", selected: plan_kind == k, "{k.label()}" }
+                        }
+                    }
+                    textarea {
+                        class: "kit-lib-notes-input",
+                        placeholder: "Outline, script, what to show",
+                        value: "{notes}",
+                        oninput: move |e| {
+                            if let Some(p) = planning.write().as_mut() {
+                                p.3 = e.value();
+                            }
+                        },
+                    }
+                    button {
+                        class: "kit-chip kit-on",
+                        disabled: title.trim().is_empty() || day.is_empty(),
+                        onclick: move |_| {
+                            let Some((title, day, kind, notes)) = planning.peek().clone() else { return };
+                            match library::plan(kind, &title, &day, &notes, Vec::new()) {
+                                Ok(_) => {
+                                    planning.set(None);
+                                    error.set(None);
+                                    items.set(library::load_all());
+                                }
+                                Err(e) => error.set(Some(format!("Couldn't plan it: {e}"))),
+                            }
+                        },
+                        "Put it on the calendar"
+                    }
+                }
             }
             if let Some(e) = error() {
                 p { class: "kit-lib-error", "{e}" }
@@ -269,6 +350,9 @@ pub fn LibraryView(
                                             span { class: "kit-missing", "{missing} moved or deleted" }
                                         }
                                     }
+                                    if !item.notes.is_empty() {
+                                        p { class: "kit-lib-notes", "{item.notes}" }
+                                    }
                                     if !item.links.is_empty() {
                                         div { class: "kit-lib-links",
                                             for link in item.links.clone() {
@@ -317,6 +401,16 @@ pub fn LibraryView(
                                                 "Play"
                                             }
                                         }
+                                        if let Some(url) = item.url.clone() {
+                                            button {
+                                                class: "kit-chip",
+                                                title: "{url}",
+                                                onclick: move |_| {
+                                                    crate::browser::open(&url);
+                                                },
+                                                "Online"
+                                            }
+                                        }
                                         if let Some(path) = reveal {
                                             button {
                                                 class: "kit-chip",
@@ -325,7 +419,7 @@ pub fn LibraryView(
                                                 "Show"
                                             }
                                         }
-                                        if item.app == "library" {
+                                        if item.app == "library" || item.status == Status::Planned {
                                             button {
                                                 class: "kit-chip",
                                                 title: "Take it out of the library; the file stays where it is",
