@@ -1,8 +1,7 @@
 //! What every mayorana desktop app shares, kept in one place so a fix lands in
 //! all of them at once.
 //!
-//! * [`telemetry`]: anonymous usage statistics (gitagent keeps its own, richer
-//!   version);
+//! * [`telemetry`]: anonymous usage statistics;
 //! * [`update_check`]: whether a newer release is published, and the download
 //!   link for this computer;
 //! * [`self_update`]: downloading that build, checking it and putting it in

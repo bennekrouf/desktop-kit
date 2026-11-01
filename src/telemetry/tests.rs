@@ -447,3 +447,68 @@ fn dates_are_formatted_without_a_date_library() {
     assert_eq!(timestamp_of(1_790_000_000), "2026-09-21T14:13:20Z");
     assert_eq!(date_of(4_102_444_799), "2099-12-31");
 }
+
+#[test]
+fn a_custom_event_carries_only_its_vocabulary() {
+    let (name, p) = Event::Custom {
+        name: "approval_decided",
+        props: vec![
+            ("approved", Value::Flag(true)),
+            ("by", Value::Tag("person")),
+            ("n", Value::Count(3)),
+        ],
+    }
+    .wire();
+    assert_eq!(name, "approval_decided");
+    assert_eq!(p["approved"], "yes");
+    assert_eq!(p["by"], "person");
+    assert_eq!(p["n"], "3");
+}
+
+#[test]
+fn a_milestone_fires_once_with_the_install_age() {
+    let dir = scratch();
+    record_in(&dir, true, &Event::AppStarted, NOW);
+    record_in(&dir, true, &Event::Milestone("first_win"), NOW + 3 * 86_400);
+    record_in(&dir, true, &Event::Milestone("first_win"), NOW + 4 * 86_400);
+    let firsts: Vec<_> = queued(&dir)
+        .into_iter()
+        .filter(|e| e["n"] == "first_win")
+        .collect();
+    assert_eq!(firsts.len(), 1);
+    assert_eq!(firsts[0]["p"]["days"], "3");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn days_round_trip_through_dates() {
+    for secs in [0, NOW, 951_782_400 /* 2000-02-29 */] {
+        assert_eq!(days_of(&date_of(secs)), Some((secs / 86_400) as i64));
+    }
+}
+
+#[test]
+fn legacy_state_is_adopted_once_with_its_milestones() {
+    let old = scratch();
+    let new = scratch();
+    std::fs::create_dir_all(&old).unwrap();
+    std::fs::write(
+        old.join(STATE_FILE),
+        r#"{"consent":false,"informed":true,"install_id":"abc","first_seen":"2026-01-01","activated":true}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        old.join(QUEUE_FILE),
+        "{\"n\":\"app_started\",\"t\":1,\"l\":\"x\",\"av\":\"1\"}\n",
+    )
+    .unwrap();
+    adopt_legacy_in(&new, &old, &[("activated", "first_flow_completed")]);
+    let state = load_state(&new);
+    assert_eq!(state.consent, Some(false));
+    assert_eq!(state.install_id, "abc");
+    assert_eq!(state.milestones, vec!["first_flow_completed".to_string()]);
+    assert_eq!(queued(&new).len(), 1);
+    assert!(!old.join(STATE_FILE).exists());
+    let _ = std::fs::remove_dir_all(&old);
+    let _ = std::fs::remove_dir_all(&new);
+}

@@ -47,6 +47,12 @@ fn load_own() -> Option<Saved> {
     serde_json::from_str(&text).ok()
 }
 
+/// The app's saved licence and api0's last answer, brought in line with the
+/// shared file — for an app that reads more into it than [`Status`] does.
+pub fn saved() -> Option<Saved> {
+    load()
+}
+
 /// The app's saved licence, brought in line with the shared file.
 fn load() -> Option<Saved> {
     let path = file()?;
@@ -160,25 +166,36 @@ pub async fn activate(typed: &str) -> Result<Status, String> {
 /// Checks the saved licence with api0 again, when `force`d or a day after the
 /// last check, and keeps the answer. Offline, the last answer stands.
 pub async fn refresh(force: bool) -> Status {
-    let Some(mut saved) = load() else {
+    let Some(saved) = load() else {
         return Status::Free;
     };
     if !force && !check_due(&saved, now()) {
         return status_now(Some(&saved), now());
     }
-    match ask(&saved.licence).await {
-        Ok(answer) => {
-            saved.answer = Some(answer);
-            saved.checked = now();
-            let _ = save(&saved);
-        }
-        Err(CheckError::Unknown) => {
-            saved.answer = None;
-            let _ = save(&saved);
-        }
-        Err(CheckError::Unreachable(_)) => {}
+    check_saved(saved).await.unwrap_or_else(|_| current())
+}
+
+/// Checks the saved licence with api0 now and keeps the answer. `Err` when
+/// api0 couldn't be reached: [`current`] then still holds the last answer,
+/// and an app may want to try again sooner than a day.
+pub async fn check() -> Result<Status, String> {
+    match load() {
+        Some(saved) => check_saved(saved).await,
+        None => Ok(Status::Free),
     }
-    status_now(Some(&saved), now())
+}
+
+async fn check_saved(mut saved: Saved) -> Result<Status, String> {
+    match ask(&saved.licence).await {
+        Ok(answer) => saved.answer = Some(answer),
+        // Checked, and unknown: `checked` says api0 was asked, which tells
+        // an unknown number from one not checked yet.
+        Err(CheckError::Unknown) => saved.answer = None,
+        Err(CheckError::Unreachable(e)) => return Err(e),
+    }
+    saved.checked = now();
+    let _ = save(&saved);
+    Ok(status_now(Some(&saved), now()))
 }
 
 /// The address of the page where the subscription is changed or cancelled.
