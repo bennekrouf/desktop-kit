@@ -54,11 +54,8 @@ pub struct UpdateInfo {
     /// the build itself rather than opening a page to pick one from. The app's
     /// page on mayorana.ch when no build fits.
     pub download_url: String,
-    /// The published digest of that build, empty when there is none.
-    ///
-    /// The banner hands the link to the person's browser, so the app never sees
-    /// the downloaded bytes and cannot check them. An app may show the digest,
-    /// so that someone who cares can.
+    /// The published digest of that build, empty when there is none. Install &
+    /// restart checks the download against it, and is not offered without it.
     pub sha256: String,
 }
 
@@ -175,7 +172,7 @@ fn for_cpu<'a>(arch: &str, builds: &'a BTreeMap<String, Artifact>) -> Option<&'a
         })
 }
 
-fn is_newer(a: &str, b: &str) -> bool {
+pub(crate) fn is_newer(a: &str, b: &str) -> bool {
     let parse = |s: &str| -> Option<(u32, u32, u32)> {
         let mut parts = s.trim_start_matches('v').split('.');
         let major = parts.next()?.parse().ok()?;

@@ -5,6 +5,8 @@
 //!   version);
 //! * [`update_check`]: whether a newer release is published, and the download
 //!   link for this computer;
+//! * [`self_update`]: downloading that build, checking it and putting it in
+//!   place of the running app;
 //! * [`notice`]: the one-line message mayorana.ch can show in every app;
 //! * [`feedback`]: the links back to mayorana.ch;
 //! * [`licence`]: the licence number, api0's answer about it, and the
@@ -31,6 +33,7 @@ pub mod library;
 pub mod licence;
 pub mod notice;
 pub mod region;
+pub mod self_update;
 pub mod telemetry;
 #[cfg(feature = "ui")]
 pub mod ui;

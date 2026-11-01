@@ -1,4 +1,5 @@
-//! The messages that can show under the header: a newer release, a notice
+//! The messages that can show under the header: a newer release (installed in
+//! one click where this copy can replace itself), a notice
 //! from mayorana.ch and, once, the usage-statistics notice.
 //!
 //! Each looks for itself a few seconds after start-up, so neither slows a cold
@@ -10,6 +11,7 @@ use std::time::Duration;
 use dioxus::prelude::*;
 
 use crate::notice::{self, Notice};
+use crate::self_update::{self, Stage};
 use crate::telemetry::{self, Event};
 use crate::update_check::{self, UpdateInfo};
 
@@ -34,6 +36,13 @@ pub fn Banners(
     children: Element,
 ) -> Element {
     let mut update = use_signal(|| Option::<UpdateInfo>::None);
+    // Whether this copy can put the new build in place itself, and how far an
+    // install has got. A failure keeps the banner, with the reason, and the
+    // button to try again. Starts with what the last attempt left, so an app
+    // that quit to update and came back on the old version says why.
+    let mut installable = use_signal(|| false);
+    let mut installing = use_signal(|| Option::<Stage>::None);
+    let mut failed = use_signal(self_update::last_failure);
     let mut notice = use_signal(|| Option::<Notice>::None);
     let mut ask = use_signal(|| false);
 
@@ -56,6 +65,7 @@ pub fn Banners(
                         None if statistics => telemetry::record(Event::UpdateOffered { to }),
                         None => {}
                     }
+                    installable.set(self_update::installable(&info));
                     update.set(Some(info));
                 }
             }
@@ -85,47 +95,109 @@ pub fn Banners(
 
     let name = crate::app().map_or("", |a| a.name);
     let version = crate::app().map_or("", |a| a.version);
+    let clicked = move |to: String| match on_update_clicked {
+        Some(clicked) => clicked.call(to),
+        None if statistics => telemetry::record(Event::UpdateClicked { to }),
+        None => {}
+    };
+    // Downloads, checks and prepares off the UI thread, showing how far it
+    // got, then quits: what was started beside the app swaps the new version
+    // in and opens it.
+    let mut install = move |info: UpdateInfo| {
+        clicked(info.latest_version.clone());
+        failed.set(None);
+        installing.set(Some(Stage::Downloading(0)));
+        spawn(async move {
+            let (tx, rx) = tokio::sync::watch::channel(Stage::Downloading(0));
+            let job = tokio::task::spawn_blocking(move || {
+                self_update::install(&info, &|stage| {
+                    let _ = tx.send(stage);
+                })
+            });
+            while !job.is_finished() {
+                let stage = rx.borrow().clone();
+                installing.set(Some(stage));
+                tokio::time::sleep(Duration::from_millis(200)).await;
+            }
+            match job.await {
+                Ok(Ok(())) => std::process::exit(0),
+                Ok(Err(e)) => failed.set(Some(e)),
+                Err(e) => failed.set(Some(e.to_string())),
+            }
+            installing.set(None);
+        });
+    };
     rsx! {
         style { {STYLE} }
         div { class: "kit-banners",
             if let Some(info) = update() {
                 div { class: "kit-banner", role: "status",
                     span { class: "kit-banner-text",
-                        "{name} "
-                        strong { "{info.latest_version}" }
-                        " is available (you have {version})."
-                    }
-                    // A button, not a link: the address comes from a remote
-                    // file and opens in the browser, never in the app.
-                    button {
-                        class: "kit-banner-link",
-                        onclick: {
-                            let info = info.clone();
-                            move |_| {
-                                let to = info.latest_version.clone();
-                                match on_update_clicked {
-                                    Some(clicked) => clicked.call(to),
-                                    None if statistics => telemetry::record(Event::UpdateClicked { to }),
-                                    None => {}
-                                }
-                                crate::browser::open(&info.download_url);
-                            }
-                        },
-                        "Download"
-                    }
-                    if !info.sha256.is_empty() {
-                        span {
-                            class: "kit-banner-sha",
-                            title: "SHA-256 of the published build: compare it with the file you downloaded. Full value: {info.sha256}",
-                            "sha256 {short(&info.sha256)}…"
+                        match (installing(), failed()) {
+                            (Some(Stage::Downloading(bytes)), _) => rsx! {
+                                "Downloading {name} "
+                                strong { "{info.latest_version}" }
+                                "… {megabytes(bytes)}"
+                            },
+                            (Some(Stage::Checking), _) => rsx! {
+                                "Checking the download of {name} "
+                                strong { "{info.latest_version}" }
+                                "…"
+                            },
+                            (Some(Stage::Installing), _) => rsx! {
+                                "Installing {name} "
+                                strong { "{info.latest_version}" }
+                                ": it restarts in a moment."
+                            },
+                            (None, Some(e)) => rsx! {
+                                "Couldn't install {name} "
+                                strong { "{info.latest_version}" }
+                                ": {e}."
+                            },
+                            (None, None) => rsx! {
+                                "{name} "
+                                strong { "{info.latest_version}" }
+                                " is available (you have {version})."
+                            },
                         }
                     }
-                    button {
-                        class: "kit-banner-close",
-                        title: "Hide until the next launch",
-                        aria_label: "Hide the update notice",
-                        onclick: move |_| update.set(None),
-                        "×"
+                    if installing().is_none() {
+                        // One button. A copy that can't replace itself (a
+                        // `cargo` build, a folder that isn't the person's)
+                        // gets the build in the browser instead.
+                        if installable() {
+                            button {
+                                class: "kit-banner-link",
+                                title: "Download {info.latest_version}, check it, install it in place of this version and restart {name}",
+                                onclick: {
+                                    let info = info.clone();
+                                    move |_| install(info.clone())
+                                },
+                                "Install & restart"
+                            }
+                        } else {
+                            // A button, not a link: the address comes from a
+                            // remote file and opens in the browser, never in
+                            // the app.
+                            button {
+                                class: "kit-banner-link",
+                                onclick: {
+                                    let info = info.clone();
+                                    move |_| {
+                                        clicked(info.latest_version.clone());
+                                        crate::browser::open(&info.download_url);
+                                    }
+                                },
+                                "Download"
+                            }
+                        }
+                        button {
+                            class: "kit-banner-close",
+                            title: "Hide until the next launch",
+                            aria_label: "Hide the update notice",
+                            onclick: move |_| update.set(None),
+                            "×"
+                        }
                     }
                 }
             }
@@ -202,7 +274,7 @@ async fn wait_a_day() {
     }
 }
 
-/// The first 12 characters of a digest, enough to compare by eye.
-fn short(digest: &str) -> &str {
-    digest.get(..12).unwrap_or(digest)
+/// `12.3 MB`, for the download so far.
+fn megabytes(bytes: u64) -> String {
+    format!("{:.1} MB", bytes as f64 / 1_000_000.0)
 }
