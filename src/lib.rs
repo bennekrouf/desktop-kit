@@ -8,6 +8,7 @@
 //!   place of the running app;
 //! * [`notice`]: the one-line message mayorana.ch can show in every app;
 //! * [`feedback`]: the links back to mayorana.ch;
+//! * [`mcp`]: the MCP server over stdio, apart from each app's tools;
 //! * [`licence`]: the licence number, api0's answer about it, and the
 //!   requests that check it;
 //! * [`browser`]: opening a web page in the person's browser;
@@ -30,6 +31,7 @@ pub mod http;
 pub mod launch;
 pub mod library;
 pub mod licence;
+pub mod mcp;
 pub mod notice;
 pub mod region;
 pub mod self_update;
