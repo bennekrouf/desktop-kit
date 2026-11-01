@@ -20,6 +20,8 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
+    /// An idea with a day: a video to record, a post to write.
+    Planned,
     Recording,
     Polishing,
     Ready,
@@ -29,7 +31,8 @@ pub enum Status {
 }
 
 impl Status {
-    pub const ALL: [Status; 6] = [
+    pub const ALL: [Status; 7] = [
+        Status::Planned,
         Status::Recording,
         Status::Polishing,
         Status::Ready,
@@ -40,6 +43,7 @@ impl Status {
 
     pub fn key(self) -> &'static str {
         match self {
+            Status::Planned => "planned",
             Status::Recording => "recording",
             Status::Polishing => "polishing",
             Status::Ready => "ready",
@@ -51,6 +55,7 @@ impl Status {
 
     pub fn label(self) -> &'static str {
         match self {
+            Status::Planned => "Planned",
             Status::Recording => "Recording",
             Status::Polishing => "Polishing",
             Status::Ready => "Ready",
@@ -199,6 +204,12 @@ pub struct Item {
     /// What its app opens it by: a take's folder, a recording's path, a post's file.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub open: String,
+    /// What the person or Claude wrote down: an idea's outline, a demo's script.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub notes: String,
+    /// Where it is online, once posted or published.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     /// Seconds since 1970, when it was last written.
     #[serde(default)]
     pub updated: u64,
@@ -227,6 +238,8 @@ impl Item {
             links: Vec::new(),
             date: today(),
             open: String::new(),
+            notes: String::new(),
+            url: None,
             updated: now(),
         }
     }
@@ -396,6 +409,12 @@ fn upsert_in(dir: &Path, mut item: Item) -> std::io::Result<Item> {
                 item.links.push(l.clone());
             }
         }
+        if item.notes.is_empty() {
+            item.notes.clone_from(&old.notes);
+        }
+        if item.url.is_none() {
+            item.url.clone_from(&old.url);
+        }
         // A post's status and date are its own app's; media keep theirs until the work moves on.
         let is_post = matches!(item.kind, Kind::Blog | Kind::Social);
         let moved = old.auto != Some(item.status) && item.status > old.status;
@@ -433,6 +452,88 @@ fn set_status_in(dir: &Path, id: &str, status: Status) -> std::io::Result<()> {
         item.manual = true;
         item.date = today();
     })
+}
+
+pub fn set_notes(id: &str, notes: &str) -> std::io::Result<()> {
+    change(&need_dir()?, id, |item| {
+        item.notes = notes.trim().to_string()
+    })
+}
+
+/// An idea put on the calendar before anything is made: a video to record on `date`, a post
+/// to write. It shows as planned until [`fulfil`] hands it to what was made.
+pub fn plan(
+    kind: Kind,
+    title: &str,
+    date: &str,
+    notes: &str,
+    tags: Vec<String>,
+) -> std::io::Result<Item> {
+    plan_in(&need_dir()?, kind, title, date, notes, tags)
+}
+
+fn plan_in(
+    dir: &Path,
+    kind: Kind,
+    title: &str,
+    date: &str,
+    notes: &str,
+    tags: Vec<String>,
+) -> std::io::Result<Item> {
+    let slug: String = title
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect();
+    let mut item = Item::new(
+        format!("plan:{}-{slug}", now()),
+        "library",
+        kind,
+        title.trim(),
+        Status::Planned,
+    );
+    item.date = date.trim().to_string();
+    item.notes = notes.trim().to_string();
+    item.tags = tags;
+    upsert_in(dir, item)
+}
+
+/// What was made for a planned idea (`into`, a take, a recording, a post) takes over its
+/// notes, tags and links, and the idea leaves the calendar. Gives the item as it is now.
+pub fn fulfil(plan: &str, into: &str) -> std::io::Result<Item> {
+    fulfil_in(&need_dir()?, plan, into)
+}
+
+fn fulfil_in(dir: &Path, plan: &str, into: &str) -> std::io::Result<Item> {
+    let read = |id: &str| -> std::io::Result<Item> {
+        serde_json::from_slice(&std::fs::read(file_of(dir, id))?).map_err(std::io::Error::other)
+    };
+    let idea = read(plan)?;
+    if idea.status != Status::Planned {
+        return Err(std::io::Error::other(format!(
+            "{plan} isn't a planned idea"
+        )));
+    }
+    let mut item = read(into)?;
+    if item.notes.is_empty() {
+        item.notes = idea.notes;
+    } else if !idea.notes.is_empty() {
+        item.notes = format!("{}\n\n{}", idea.notes, item.notes);
+    }
+    for t in idea.tags {
+        if !item.tags.contains(&t) {
+            item.tags.push(t);
+        }
+    }
+    for l in idea.links {
+        if !item.links.iter().any(|n| n.target == l.target) {
+            item.links.push(l);
+        }
+    }
+    item.updated = now();
+    write(dir, &item)?;
+    std::fs::remove_file(file_of(dir, plan))?;
+    Ok(item)
 }
 
 pub fn set_tags(id: &str, tags: Vec<String>) -> std::io::Result<()> {
@@ -595,6 +696,8 @@ pub fn day_of(at: std::time::SystemTime) -> String {
 pub fn today() -> String {
     chrono::Local::now().format("%Y-%m-%d").to_string()
 }
+
+pub mod mcp;
 
 #[cfg(test)]
 mod tests;
