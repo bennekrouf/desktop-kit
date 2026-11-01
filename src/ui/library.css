@@ -1,0 +1,102 @@
+/* The shared media library and pipeline calendar. Colours come from the app's
+   --kit-* variables, as the header's do; the status colours are the same in
+   every app so a status reads the same wherever it is seen. */
+.kit-library, .kit-cal {
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 16px 20px; box-sizing: border-box; min-height: 100%;
+    color: var(--kit-text, #e6e8ec);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+}
+.kit-library.kit-drop-over { outline: 2px dashed var(--kit-accent, #6ea8fe); outline-offset: -6px; }
+
+.kit-lib-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.kit-lib-search {
+    flex: 1; min-width: 180px; height: 30px; box-sizing: border-box; padding: 0 10px;
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 6px;
+    background: var(--kit-bar, #1a1d24); color: inherit; font: inherit;
+}
+.kit-lib-select, .kit-lib-tags {
+    height: 28px; box-sizing: border-box; padding: 0 8px;
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 6px;
+    background: var(--kit-bar, #1a1d24); color: inherit; font: inherit; font-size: 12.5px;
+}
+.kit-lib-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.kit-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px; box-sizing: border-box;
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 13px;
+    background: transparent; color: var(--kit-muted, #8a909c);
+    font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.kit-chip:hover { color: var(--kit-text, #e6e8ec); background: var(--kit-hover, rgba(255, 255, 255, 0.06)); }
+.kit-chip.kit-on { color: var(--kit-text, #e6e8ec); border-color: var(--kit-accent, #6ea8fe); }
+.kit-lib-count { margin-left: auto; color: var(--kit-muted, #8a909c); font-size: 12px; font-variant-numeric: tabular-nums; }
+.kit-lib-error { margin: 0; padding: 8px 10px; border-radius: 6px; background: rgba(240, 90, 90, 0.12); color: #f08a8a; }
+.kit-lib-empty { color: var(--kit-muted, #8a909c); text-align: center; padding: 40px 0; }
+.kit-lib-empty p { margin: 4px 0; }
+.kit-lib-hint { margin: 0; color: var(--kit-muted, #8a909c); font-size: 12px; text-align: center; }
+
+.kit-lib-list { display: flex; flex-direction: column; gap: 6px; }
+.kit-lib-row {
+    display: flex; gap: 16px; align-items: flex-start;
+    padding: 10px 12px; border: 1px solid var(--kit-line, #2a2f3a); border-radius: 8px;
+    background: var(--kit-bar, #1a1d24);
+}
+.kit-lib-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.kit-lib-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.kit-lib-kind {
+    flex-shrink: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--kit-muted, #8a909c);
+}
+.kit-lib-name {
+    border: 0; padding: 0; background: none; color: inherit; font: inherit; font-weight: 600; font-size: 14px;
+    text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kit-lib-name:hover { color: var(--kit-accent, #6ea8fe); }
+.kit-lib-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--kit-muted, #8a909c); font-size: 12px; }
+.kit-lib-file { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kit-missing { color: #e5a050; }
+.kit-lib-file.kit-missing { text-decoration: line-through; }
+.kit-lib-links { display: flex; flex-wrap: wrap; gap: 4px; }
+.kit-link {
+    border: 0; padding: 2px 6px; border-radius: 4px; background: var(--kit-hover, rgba(255, 255, 255, 0.06));
+    color: var(--kit-accent, #6ea8fe); font: inherit; font-size: 12px; cursor: pointer;
+}
+.kit-lib-side { display: flex; flex-direction: column; gap: 6px; align-items: stretch; width: 190px; flex-shrink: 0; }
+.kit-lib-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* One colour per status, everywhere. */
+.kit-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--kit-status); }
+.kit-status-recording { --kit-status: #e5534b; }
+.kit-status-polishing { --kit-status: #e5a050; }
+.kit-status-ready { --kit-status: #57ab5a; }
+.kit-status-queued { --kit-status: #6ea8fe; }
+.kit-status-posted { --kit-status: #b083f0; }
+.kit-status-published { --kit-status: #8a909c; }
+.kit-status-select { border-left: 4px solid var(--kit-status); }
+
+.kit-cal-month { margin: 0 6px; font-size: 15px; font-weight: 600; min-width: 140px; text-align: center; }
+.kit-cal-legend { margin-left: auto; }
+.kit-legend { display: inline-flex; align-items: center; gap: 5px; color: var(--kit-muted, #8a909c); font-size: 12px; margin-left: 8px; }
+.kit-cal-grid {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px;
+    background: var(--kit-line, #2a2f3a); border: 1px solid var(--kit-line, #2a2f3a); border-radius: 8px; overflow: hidden;
+}
+.kit-cal-head { padding: 6px 8px; background: var(--kit-bar, #1a1d24); color: var(--kit-muted, #8a909c); font-size: 11px; text-transform: uppercase; }
+.kit-cal-day {
+    min-height: 92px; padding: 4px; background: var(--kit-bar, #1a1d24);
+    display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+.kit-cal-out { opacity: 0.45; }
+.kit-cal-today .kit-cal-num { color: var(--kit-accent, #6ea8fe); font-weight: 700; }
+.kit-cal-num { font-size: 11px; color: var(--kit-muted, #8a909c); padding: 0 2px; }
+.kit-cal-item {
+    display: block; width: 100%; box-sizing: border-box; padding: 2px 6px;
+    border: 0; border-left: 3px solid var(--kit-status); border-radius: 3px;
+    background: var(--kit-hover, rgba(255, 255, 255, 0.06)); color: inherit;
+    font: inherit; font-size: 11.5px; text-align: left; cursor: pointer;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kit-cal-item:hover { filter: brightness(1.2); }
+.kit-cal-time { color: var(--kit-muted, #8a909c); margin-right: 4px; font-variant-numeric: tabular-nums; }

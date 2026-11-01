@@ -10,6 +10,9 @@
 //! * [`licence`]: the licence number, api0's answer about it, and the
 //!   requests that check it;
 //! * [`browser`]: opening a web page in the person's browser;
+//! * [`library`]: the media library and pipeline statuses the apps share,
+//!   with [`handoff`] notes from one app to another and [`launch`] to open
+//!   them and the person's files;
 //! * [`region`]: the AI regions api0 offers, with their flags;
 //! * [`ui`] (with the `ui` feature): the header, the banners under it and the
 //!   Pro window every app shows.
@@ -21,7 +24,10 @@
 mod app;
 pub mod browser;
 pub mod feedback;
+pub mod handoff;
 pub mod http;
+pub mod launch;
+pub mod library;
 pub mod licence;
 pub mod notice;
 pub mod region;

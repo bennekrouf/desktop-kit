@@ -2,7 +2,8 @@
 //! version on the left, what the app switches between in the middle, and on
 //! the right the app's own buttons, then the model, Settings, MCP, Feedback,
 //! the theme and, in the corner, the licence. The banners under it: a newer
-//! release, a notice, the usage-statistics question. And the Pro window.
+//! release, a notice, the usage-statistics question. The Pro window. And the
+//! media library and pipeline calendar the apps share.
 //!
 //! Its colours come from the app: each stylesheet sets the `--kit-*`
 //! variables on `body` (so `body.light` changes them too), and gives its
@@ -12,12 +13,14 @@
 mod banners;
 mod flag;
 mod header;
+mod library;
 mod pro;
 mod theme;
 
 pub use banners::Banners;
 pub use flag::RegionFlag;
 pub use header::{Header, ModelBadge, ProBadge, ProLook};
+pub use library::{open_in, use_library, LibraryView, PipelineCalendar, LIBRARY_STYLE};
 pub use pro::{use_pro, Pro, ProButton, ProWindow};
 pub use theme::{use_theme, Theme, ThemeToggle};
 
