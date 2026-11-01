@@ -7,10 +7,26 @@ name: Tag
 # Cargo.toml is the release: bump it in the PR that changes the kit, and the
 # merge to main gets `v<version>` here. A push that keeps the version tags
 # nothing. Run it by hand to tag main's version if a push was missed.
+#
+# Then every app moves to the new tag by itself: a pull request in each, made
+# by `apps` below, sets DESKTOP_KIT_REF, updates Cargo.lock and adds the
+# version's notes from CHANGELOG.md. Merged once the app's CI passes, where the
+# repository allows auto-merge. Run by hand with a tag to redo that for one
+# already pushed.
+#
+# Needs an APPS_TOKEN secret: a fine-grained PAT on the app repositories with
+# "Contents" and "Pull requests" read and write. The tag is pushed with
+# GITHUB_TOKEN, which starts no other workflow, so the apps are moved from
+# here rather than from a workflow on the tag; and a pull request opened with
+# GITHUB_TOKEN would not run the app's CI either.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Move the apps to this tag (e.g. v0.1.5) instead of tagging"
+        required: false
 
 # One at a time, so two merges in a row never race for the same tag.
 concurrency:
@@ -22,11 +38,15 @@ permissions:
 
 jobs:
   tag:
+    if: inputs.tag == ''
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Tag the version in Cargo.toml
+        id: tag
         run: |
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
           if [ -z "$version" ]; then
@@ -41,3 +61,85 @@ jobs:
           git tag "$tag" "$GITHUB_SHA"
           git push origin "refs/tags/$tag"
           echo "Tagged $tag on $GITHUB_SHA."
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  apps:
+    needs: tag
+    # After a new tag, or by hand with one. `always()` so a manual run, which
+    # skips `tag`, still gets here.
+    if: always() && (needs.tag.outputs.tag != '' || inputs.tag != '')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { repo: gitagent, name: GitAgent }
+          - { repo: jobscout, name: JobScout }
+          - { repo: polishcast, name: PolishCast }
+          - { repo: publishkit, name: PublishKit }
+          - { repo: shipscreen, name: ShipScreen }
+          - { repo: spreadradar, name: SpreadRadar }
+          - { repo: surface-watch, name: SurfaceWatch }
+          - { repo: trackcut, name: TrackCut }
+    env:
+      TAG: ${{ needs.tag.outputs.tag || inputs.tag }}
+      GH_TOKEN: ${{ secrets.APPS_TOKEN }}
+    steps:
+      - name: Check the token
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::APPS_TOKEN is not set: the apps can't be moved to $TAG."
+            exit 1
+          fi
+
+      # Side by side, as the apps build: Cargo.toml has path = "../desktop-kit".
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          path: desktop-kit
+      - uses: actions/checkout@v4
+        with:
+          repository: bennekrouf/${{ matrix.repo }}
+          token: ${{ secrets.APPS_TOKEN }}
+          path: app
+
+      - name: Move to ${{ env.TAG }}
+        id: bump
+        working-directory: app
+        run: |
+          notes=$(python3 ../desktop-kit/scripts/bump_app.py . "${{ matrix.name }}" "$TAG" ../desktop-kit)
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+          # Installs the toolchain rust-toolchain.toml pins, then takes the
+          # kit's new dependencies into the lock file.
+          cargo update -p desktop-kit
+          git status --short
+
+      - name: Open the pull request
+        working-directory: app
+        env:
+          NOTES: ${{ steps.bump.outputs.notes }}
+        run: |
+          if git diff --quiet; then
+            echo "${{ matrix.repo }} is already on $TAG."
+            exit 0
+          fi
+          branch="desktop-kit/$TAG"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git commit -am "chore: move to desktop-kit $TAG"
+          git push --force origin "$branch"
+
+          title="chore: move to desktop-kit $TAG"
+          body="Moves ${{ matrix.name }} to [desktop-kit $TAG](https://github.com/bennekrouf/desktop-kit/releases/tag/$TAG): DESKTOP_KIT_REF, Cargo.lock and the release notes for the kit's changes. Opened by desktop-kit's tag workflow."
+          if [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            gh pr create --head "$branch" --title "$title" --body "$body"
+          fi
+          if [ "$NOTES" = "no-notes" ]; then
+            gh label create no-notes --color ededed --force >/dev/null 2>&1 || true
+            gh pr edit "$branch" --add-label no-notes
+          fi
+          # Merged when the app's checks pass. Off in a repository that
+          # doesn't allow auto-merge: the pull request then waits for a click.
+          gh pr merge "$branch" --auto --squash \
+            || echo "::notice::Auto-merge is off in ${{ matrix.repo }}: merge the pull request by hand."

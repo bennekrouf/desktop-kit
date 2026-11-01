@@ -22,6 +22,58 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  # ── Version bump: blocking, on pull requests ───────────────────────────────
+  # tag.yml tags main only when the version in Cargo.toml is new. A PR that
+  # changes the kit but keeps the version is never tagged, so no app can pin
+  # it, and every app's Cargo.lock built against the local kit then fails
+  # `--locked` on the tag CI checks out (#8 did this: sha2 added under 0.1.4).
+  version:
+    name: Version bump
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Cargo.toml version
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # What an app builds: the manifest and the code. CI, hooks, docs and
+          # the kit's own Cargo.lock never reach an app.
+          KIT_FILES=$(git diff --name-only "$BASE"..."$HEAD" -- Cargo.toml 'src/**' || true)
+          if [[ -z "$KIT_FILES" ]]; then
+            echo "No kit files changed — no version needed."
+            exit 0
+          fi
+
+          version_at() { git show "$1:Cargo.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1; }
+          OLD=$(version_at "$(git merge-base "$BASE" "$HEAD")")
+          NEW=$(version_at "$HEAD")
+
+          if [[ "$NEW" == "$OLD" ]]; then
+            echo "::error file=Cargo.toml::This PR changes the kit but keeps version $OLD, so it will never be tagged."
+          elif [[ "$(printf '%s\n%s\n' "$OLD" "$NEW" | sort -V | tail -n 1)" != "$NEW" ]]; then
+            echo "::error file=Cargo.toml::Version $NEW is lower than $OLD."
+          elif git rev-parse -q --verify "refs/tags/v$NEW" >/dev/null; then
+            echo "::error file=Cargo.toml::v$NEW is already tagged; take the next version."
+          elif ! grep -q "^## \[$NEW\]" CHANGELOG.md; then
+            # The apps' pull requests take their release notes from it.
+            echo "::error file=CHANGELOG.md::No '## [$NEW]' section: add one, empty if no user would notice the change."
+          else
+            echo "Version $OLD → $NEW; tag.yml tags v$NEW on merge and moves the apps to it."
+            exit 0
+          fi
+          echo "Changed kit files:"
+          echo "$KIT_FILES" | sed 's/^/  /'
+          echo
+          echo "Bump version in Cargo.toml (and run cargo check to update Cargo.lock),"
+          echo "and add its section to CHANGELOG.md. After the merge, the tag workflow"
+          echo "opens a pull request in each app that moves it to the new tag."
+          exit 1
+
   # ── Formatting: blocking ───────────────────────────────────────────────────
   # No compile, reports in ~20s. .githooks/pre-commit formats what is staged,
   # so this is a real gate rather than a check that is red forever.
