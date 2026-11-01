@@ -14,7 +14,7 @@ not added twice.
 - No change a user could notice? Write the heading and nothing under it: the
   apps' pull requests then take the `no-notes` label.
 
-## [Unreleased]
+## [0.1.6]
 
 ### Added
 
