@@ -25,8 +25,8 @@
 mod online;
 
 pub use online::{
-    activate, buy_url, current, deactivate, portal_url, refresh, request_free_credits, status_now,
-    title_badge,
+    activate, buy_url, check, current, deactivate, portal_url, refresh, request_free_credits,
+    saved, status_now, title_badge,
 };
 
 use serde::{Deserialize, Serialize};
@@ -145,7 +145,8 @@ impl Answer {
 }
 
 /// What is kept on disk: the licence number, and api0's last answer with when
-/// it came (seconds since 1970, this computer's clock).
+/// it came (seconds since 1970, this computer's clock). `checked` is 0 until
+/// api0 has been asked; with no `answer` after that, api0 didn't know it.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Saved {
     pub licence: String,

@@ -40,7 +40,9 @@
 //! to a mayorana.ch sign-in.
 //!
 //! Nothing is recorded or sent before [`crate::init`] has named the app.
-//! gitagent keeps its own, richer version, with events about its flows.
+//! An app with more to say than the shared events (GitAgent's flows) says it
+//! through [`Event::Custom`] and [`Event::Milestone`], whose values are still
+//! fixed vocabularies.
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -92,12 +94,26 @@ const FLUSH_EVERY: Duration = Duration::from_secs(5 * 60);
 
 /// Env vars that mean "do not phone home". `DISABLE_UPDATE_CHECK` is here
 /// because someone who has turned that off expects silence, not a different
-/// channel carrying the same information.
+/// channel carrying the same information. Each app also honours its own
+/// `<ID>_NO_TELEMETRY` (see [`opt_out_vars`]).
 const OPT_OUT_VARS: &[&str] = &[
     "DISABLE_UPDATE_CHECK",
     "DO_NOT_TRACK",
     "MAYORANA_NO_TELEMETRY",
 ];
+
+/// [`OPT_OUT_VARS`] plus the app's own, e.g. `GITAGENT_NO_TELEMETRY` — the
+/// name an app documented before it shared this module keeps working.
+fn opt_out_vars() -> Vec<String> {
+    let mut vars: Vec<String> = OPT_OUT_VARS.iter().map(|v| v.to_string()).collect();
+    if let Some(app) = crate::app() {
+        vars.push(format!(
+            "{}_NO_TELEMETRY",
+            app.id.to_ascii_uppercase().replace(['-', '.'], "_")
+        ));
+    }
+    vars
+}
 
 // ── What can be said ──────────────────────────────────────────────────────
 
@@ -114,6 +130,34 @@ pub enum Event {
     UpdateOffered { to: String },
     /// Its Download link was clicked.
     UpdateClicked { to: String },
+    /// An event only one app has. Its name and every value are written in the
+    /// app's code, never taken from the person's data.
+    Custom {
+        name: &'static str,
+        props: Vec<(&'static str, Value)>,
+    },
+    /// Recorded at most once per install, however often it is asked for, with
+    /// `days` since the install's first event — e.g. the first run that worked.
+    Milestone(&'static str),
+}
+
+/// What a [`Event::Custom`] can carry: nothing free-form.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Value {
+    Tag(&'static str),
+    /// Sent as `yes` / `no`.
+    Flag(bool),
+    Count(u32),
+}
+
+impl Value {
+    fn wire(self) -> String {
+        match self {
+            Value::Tag(t) => t.to_string(),
+            Value::Flag(b) => if b { "yes" } else { "no" }.to_string(),
+            Value::Count(n) => n.to_string(),
+        }
+    }
 }
 
 impl Event {
@@ -130,6 +174,14 @@ impl Event {
                 p.insert("to".to_string(), sanitise_version(to));
                 "update_clicked"
             }
+            Event::Custom { name, props } => {
+                for (k, v) in props {
+                    p.insert(k.to_string(), v.wire());
+                }
+                name
+            }
+            // `days` is added by `record_in`, which knows the install's age.
+            Event::Milestone(name) => name,
         };
         (name, p)
     }
@@ -176,7 +228,7 @@ fn parse_login_env(text: &str) -> BTreeMap<String, String> {
     text.lines()
         .filter_map(|line| line.split_once('='))
         .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
-        .filter(|(k, v)| !v.is_empty() && OPT_OUT_VARS.contains(&k.as_str()))
+        .filter(|(k, v)| !v.is_empty() && opt_out_vars().contains(k))
         .collect()
 }
 
@@ -184,7 +236,7 @@ fn parse_login_env(text: &str) -> BTreeMap<String, String> {
 fn read_login_env() -> BTreeMap<String, String> {
     use std::process::{Command, Stdio};
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
-    let script = OPT_OUT_VARS
+    let script = opt_out_vars()
         .iter()
         .map(|k| format!("printf '{k}=%s\\n' \"${k}\""))
         .collect::<Vec<_>>()
@@ -224,6 +276,13 @@ pub async fn start() -> bool {
     should_ask()
 }
 
+/// For an app that has already copied the login shell's variables into its
+/// own environment (GitAgent does, for its credentials): there is nothing more
+/// to read, so recording need not wait for [`start`]. Call before recording.
+pub fn login_env_adopted() {
+    let _ = LOGIN_ENV.set(BTreeMap::new());
+}
+
 // ── Gate ──────────────────────────────────────────────────────────────────
 
 fn endpoint() -> Option<&'static str> {
@@ -248,11 +307,12 @@ fn flag_set(value: Option<&str>) -> bool {
 }
 
 fn env_blocks() -> bool {
-    OPT_OUT_VARS.iter().any(|name| {
+    opt_out_vars().iter().any(|name| {
+        let name = name.as_str();
         let value = std::env::var(name).ok().or_else(|| login_env(name));
         // DISABLE_UPDATE_CHECK is honoured by mere presence in the update check,
         // so it is here too; the others follow the usual 0/false convention.
-        if *name == "DISABLE_UPDATE_CHECK" {
+        if name == "DISABLE_UPDATE_CHECK" {
             value.is_some()
         } else {
             flag_set(value.as_deref())
@@ -344,9 +404,13 @@ struct State {
     informed: bool,
     #[serde(default)]
     install_id: String,
-    /// `YYYY-MM-DD` of the first recorded event. Kept locally; never sent.
+    /// `YYYY-MM-DD` of the first recorded event. Kept locally; only ever sent
+    /// as a number of days, with a milestone.
     #[serde(default)]
     first_seen: String,
+    /// The [`Event::Milestone`]s already recorded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    milestones: Vec<String>,
 }
 
 /// One queued event. Carries its own launch and version because the queue can
@@ -462,6 +526,25 @@ fn civil(secs: u64) -> (i64, u32, u32, u64) {
     (year, month, day, rem)
 }
 
+/// Days since 1970-01-01 of a `YYYY-MM-DD` date — the inverse of `civil`.
+fn days_of(date: &str) -> Option<i64> {
+    let mut parts = date.splitn(3, '-').map(|p| p.parse::<i64>().ok());
+    let (y, m, d) = (parts.next()??, parts.next()??, parts.next()??);
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y.rem_euclid(400);
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    Some(era * 146_097 + doe - 719_468)
+}
+
+fn days_between(first_seen: &str, now: u64) -> u32 {
+    match (days_of(first_seen), days_of(&date_of(now))) {
+        (Some(first), Some(today)) => (today - first).max(0) as u32,
+        _ => 0,
+    }
+}
+
 fn date_of(secs: u64) -> String {
     let (y, m, d, _) = civil(secs);
     format!("{y:04}-{m:02}-{d:02}")
@@ -546,9 +629,63 @@ fn record_in(dir: &Path, on: bool, event: &Event, now: u64) {
     if new_install {
         lines.push(make_line(&Event::AppInstalled, now));
     }
-    lines.push(make_line(event, now));
+    if let Event::Milestone(name) = event {
+        // Kept in the same state as the install id, so it fires exactly once
+        // per install however many windows or restarts pass.
+        if state.milestones.iter().any(|m| m == name) {
+            append(dir, &lines);
+            return;
+        }
+        state.milestones.push(name.to_string());
+        save_state(dir, &state);
+        let mut line = make_line(event, now);
+        line.p.insert(
+            "days".to_string(),
+            days_between(&state.first_seen, now).to_string(),
+        );
+        lines.push(line);
+    } else {
+        lines.push(make_line(event, now));
+    }
 
     append(dir, &lines);
+}
+
+/// Takes over the state and queue an app kept elsewhere before it used this
+/// module, so its people keep their answer and their install keeps its
+/// identity. Does nothing once this app has state of its own here. `rename`
+/// maps a legacy boolean in the old state to the milestone it meant.
+pub fn adopt_legacy(old_dir: &Path, rename: &[(&str, &'static str)]) {
+    if let Some(dir) = dir() {
+        adopt_legacy_in(&dir, old_dir, rename);
+    }
+}
+
+fn adopt_legacy_in(dir: &Path, old_dir: &Path, rename: &[(&str, &'static str)]) {
+    let _io = IO.lock().unwrap_or_else(|e| e.into_inner());
+    let old_state = old_dir.join(STATE_FILE);
+    if dir.join(STATE_FILE).exists() || !old_state.exists() {
+        return;
+    }
+    let Ok(text) = std::fs::read_to_string(&old_state) else {
+        return;
+    };
+    let Ok(raw) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return;
+    };
+    let mut state: State = serde_json::from_value(raw.clone()).unwrap_or_default();
+    for (flag, milestone) in rename {
+        if raw.get(*flag).and_then(|v| v.as_bool()) == Some(true) {
+            state.milestones.push(milestone.to_string());
+        }
+    }
+    save_state(dir, &state);
+    let old_queue = old_dir.join(QUEUE_FILE);
+    if let Ok(queue) = std::fs::read(&old_queue) {
+        let _ = write_atomic(&dir.join(QUEUE_FILE), &queue);
+    }
+    let _ = std::fs::remove_file(old_queue);
+    let _ = std::fs::remove_file(old_state);
 }
 
 /// One GET through the app's client; true only for a 2xx answer. The purpose
