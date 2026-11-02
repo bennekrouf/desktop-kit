@@ -1,20 +1,11 @@
 # Changelog
 
-What a desktop-kit version changes for the people using the apps. Each tag's
-notes go into every app's `## [Unreleased]` on their own: the tag workflow
-opens a pull request in each app that moves it to the new tag and adds these
-notes, with `{app}` replaced by the app's name. A note an app already has is
-not added twice.
+What changed in desktop-kit, newest first. The apps build against its main
+branch, with no tag or version in between, so a change reaches every app with
+its next build. What a user will notice belongs in each app's own CHANGELOG.md,
+in the pull request that takes the change; this file is the kit's history.
 
-- Every version that changes the kit gets a section here, `## [x.y.z]`, in
-  the pull request that bumps `version` in Cargo.toml. CI refuses one without.
-- Group the bullets under `### Added`, `### Changed`, `### Fixed` or
-  `### Removed`, written for someone using the app, as in the apps' own
-  changelogs: what they will see, never a module or function name.
-- No change a user could notice? Write the heading and nothing under it: the
-  apps' pull requests then take the `no-notes` label.
-
-## [Unreleased]
+## [0.1.8]
 
 ### Changed
 
@@ -22,7 +13,6 @@ not added twice.
   for Settings, then MCP, Feedback and Pro. Nothing else. What {app} switches
   between, and its main buttons, sit in a slim bar under it.
 - Light or dark is chosen in Settings, which also shows the installed version.
-- Build and packaging only — no user-visible change.
 
 ## [0.1.7]
 
