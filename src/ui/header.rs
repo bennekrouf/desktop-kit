@@ -1,44 +1,39 @@
-//! The header itself, and the two badges apps put in it.
+//! The header itself, the two badges apps put in it, and the toolbar under it.
 
 use dioxus::prelude::*;
 
-use super::{Theme, ThemeToggle, STYLE};
+use super::STYLE;
 use crate::licence::Status;
 
-/// The bar across the top. The name and version come from [`crate::init`];
-/// Settings and MCP show only when the app passes what they open.
+/// The bar across the top, the same in every app: the model's flag, the gear
+/// that opens Settings, then MCP, Feedback and the licence. Nothing else: what
+/// an app switches between goes in a [`Toolbar`] under it, and everything it
+/// sets up goes in its Settings.
 #[component]
 pub fn Header(
-    theme: Theme,
-    /// The middle: what the app switches between (tabs, a site, a path).
-    #[props(default)]
-    children: Element,
-    /// The app's own buttons, on the right before the shared ones.
-    actions: Option<Element>,
-    /// The model this app runs on: a [`ModelBadge`], or the app's own picker.
+    /// The model this app runs on: a [`ModelBadge`]. None for an app without one.
     model: Option<Element>,
-    on_settings: Option<EventHandler<()>>,
+    on_settings: EventHandler<()>,
     on_mcp: Option<EventHandler<()>>,
     /// A [`ProBadge`]: last, so the one thing about the person rather than the
     /// work sits in the corner.
     pro: Option<Element>,
 ) -> Element {
-    let (name, version) = crate::app().map_or(("", ""), |a| (a.name, a.version));
+    let name = crate::app().map_or("", |a| a.name);
     rsx! {
         style { {STYLE} }
         header { class: "kit-header",
-            div { class: "kit-brand",
-                span { class: "kit-name", "{name}" }
-                if !version.is_empty() {
-                    span { class: "kit-version", title: "Installed version", "v{version}" }
-                }
-            }
-            div { class: "kit-middle", {children} }
             div { class: "kit-right",
-                {actions}
                 {model}
-                if let Some(open) = on_settings {
-                    button { class: "kit-btn", onclick: move |_| open.call(()), "Settings" }
+                button {
+                    class: "kit-btn kit-icon",
+                    title: "Settings",
+                    aria_label: "Settings",
+                    onclick: move |_| on_settings.call(()),
+                    svg { view_box: "0 0 24 24", "aria-hidden": "true",
+                        path { d: "M12 15a3 3 0 100-6 3 3 0 000 6z" }
+                        path { d: "M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" }
+                    }
                 }
                 if let Some(open) = on_mcp {
                     button {
@@ -56,29 +51,42 @@ pub fn Header(
                     title: "Ideas, bugs, questions: send them to the person who makes {name}",
                     "Feedback"
                 }
-                ThemeToggle { theme }
                 {pro}
             }
         }
     }
 }
 
-/// The model the app runs on, e.g. Europe with its flag for api0, or an Ollama
-/// model's name; clicking it opens where it is chosen.
+/// The slim bar under the header for what an app switches between (its tabs)
+/// and the one or two things it is for (Record, Open…). Apps' full-height
+/// layouts keep using `--kit-header-h`: it grows by this bar's height while
+/// the bar is there.
+#[component]
+pub fn Toolbar(children: Element) -> Element {
+    rsx! {
+        style { {STYLE} }
+        div { class: "kit-toolbar", {children} }
+    }
+}
+
+/// The model the app runs on, as its flag alone, e.g. Europe's for api0; a
+/// grey one for a model with no region (an Ollama model). The name shows on
+/// hover, and clicking opens where it is chosen.
 #[component]
 pub fn ModelBadge(
     label: String,
-    /// The api0 region's id, to draw its flag before the label.
+    /// The api0 region's id, to draw its flag.
     region: Option<&'static str>,
     title: String,
     onclick: EventHandler<()>,
 ) -> Element {
     rsx! {
-        button { class: "kit-btn kit-model", title, onclick: move |_| onclick.call(()),
-            if let Some(id) = region {
-                super::RegionFlag { id }
-            }
-            "{label}"
+        button {
+            class: "kit-btn kit-icon kit-model",
+            title: "{label} \u{2014} {title}",
+            aria_label: "{label}",
+            onclick: move |_| onclick.call(()),
+            super::RegionFlag { id: region.unwrap_or("") }
         }
     }
 }

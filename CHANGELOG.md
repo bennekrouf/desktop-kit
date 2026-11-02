@@ -18,6 +18,10 @@ not added twice.
 
 ### Changed
 
+- A simpler bar across the top: the flag of the model {app} runs on, a gear
+  for Settings, then MCP, Feedback and Pro. Nothing else. What {app} switches
+  between, and its main buttons, sit in a slim bar under it.
+- Light or dark is chosen in Settings, which also shows the installed version.
 - Build and packaging only — no user-visible change.
 
 ## [0.1.7]
