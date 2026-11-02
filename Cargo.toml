@@ -1,6 +1,6 @@
 [package]
 name = "desktop-kit"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 license-file = "LICENSE"
 description = "What every mayorana desktop app shares: usage statistics, the update check, the notice, the licence, and the header, banners and Pro window."
