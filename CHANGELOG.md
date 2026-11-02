@@ -14,6 +14,21 @@ not added twice.
 - No change a user could notice? Write the heading and nothing under it: the
   apps' pull requests then take the `no-notes` label.
 
+## [Unreleased]
+
+### Added
+
+- Added a 'Use it from Claude or Codex' window to the Pro window, providing
+  instructions on how to connect Claude Desktop, Claude Code, or Codex to the
+  app's MCP server.
+- Added a new MCP server module to handle communication between the app and
+  external services.
+
+### Changed
+
+- Enhanced telemetry by adding custom events and milestones, improving the
+  tracking of user interactions and app usage.
+
 ## [0.1.7]
 
 ### Changed
