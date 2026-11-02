@@ -178,6 +178,53 @@ impl Server {
     }
 }
 
+/// What connecting a client to the app takes, as the app's "Use it from Claude or Codex"
+/// window shows it: the command that starts its server, Claude Desktop's config entry, and
+/// the one line that adds it to Claude Code or Codex.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Connect {
+    /// This executable, as a client should start it.
+    pub command: String,
+    /// The `mcpServers` entry for Claude Desktop's config file. Built with serde so a
+    /// Windows path's backslashes arrive escaped.
+    pub desktop: String,
+    /// The one line that adds it to Claude Code, for every project.
+    pub code: String,
+    /// The one line that adds it to Codex. Its CLI, IDE extension and app share one list of
+    /// servers, each one there for every project.
+    pub codex: String,
+    /// Where Claude Desktop keeps its config.
+    pub config_path: &'static str,
+}
+
+impl Connect {
+    /// For the running executable, served as `id`.
+    pub fn new(id: &str) -> Self {
+        let command = std::env::current_exe()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| id.to_string());
+        Self::at(id, &command)
+    }
+
+    /// For the executable at `command`.
+    pub fn at(id: &str, command: &str) -> Self {
+        let config = json!({ "mcpServers": { id: { "command": command, "args": ["mcp"] } } });
+        Connect {
+            command: command.to_string(),
+            desktop: serde_json::to_string_pretty(&config).unwrap_or_default(),
+            code: format!("claude mcp add {id} --scope user -- \"{command}\" mcp"),
+            codex: format!("codex mcp add {id} -- \"{command}\" mcp"),
+            config_path: if cfg!(target_os = "windows") {
+                "%APPDATA%\\Claude\\claude_desktop_config.json"
+            } else if cfg!(target_os = "macos") {
+                "~/Library/Application Support/Claude/claude_desktop_config.json"
+            } else {
+                "~/.config/Claude/claude_desktop_config.json"
+            },
+        }
+    }
+}
+
 /// Writes one message. One per line, and nothing else ever on stdout: the
 /// client reads it as the protocol, so a stray print is a corrupt message.
 pub fn write(message: &Value) {
@@ -302,5 +349,37 @@ mod tests {
         let failed = SERVER.answer(&call, Err("no".into()));
         assert_eq!(failed["result"]["content"][0]["text"], "no");
         assert_eq!(failed["result"]["isError"], true);
+    }
+
+    #[test]
+    fn the_desktop_entry_starts_the_app_in_mcp_mode() {
+        let c = Connect::at(
+            "polishcast",
+            "/Applications/PolishCast.app/Contents/MacOS/polishcast",
+        );
+        let config: Value = serde_json::from_str(&c.desktop).unwrap();
+        let entry = &config["mcpServers"]["polishcast"];
+        assert_eq!(
+            entry["command"],
+            "/Applications/PolishCast.app/Contents/MacOS/polishcast"
+        );
+        assert_eq!(entry["args"], json!(["mcp"]));
+    }
+
+    #[test]
+    fn a_windows_path_survives_the_trip_through_json() {
+        let path = r"C:\Program Files\GitAgent\gitagent.exe";
+        let config: Value = serde_json::from_str(&Connect::at("gitagent", path).desktop).unwrap();
+        assert_eq!(config["mcpServers"]["gitagent"]["command"], path);
+    }
+
+    #[test]
+    fn the_terminal_commands_quote_a_path_with_spaces() {
+        let c = Connect::at("trackcut", "/A B/trackcut");
+        assert_eq!(
+            c.code,
+            "claude mcp add trackcut --scope user -- \"/A B/trackcut\" mcp"
+        );
+        assert_eq!(c.codex, "codex mcp add trackcut -- \"/A B/trackcut\" mcp");
     }
 }

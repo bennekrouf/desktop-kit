@@ -718,6 +718,7 @@ pub fn today() -> String {
 }
 
 pub mod mcp;
+pub mod pick;
 
 #[cfg(test)]
 mod tests;

@@ -32,9 +32,12 @@ pub mod launch;
 pub mod library;
 pub mod licence;
 pub mod mcp;
+#[cfg(feature = "media")]
+pub mod media;
 pub mod notice;
 pub mod region;
 pub mod self_update;
+pub mod shell;
 pub mod telemetry;
 #[cfg(feature = "ui")]
 pub mod ui;

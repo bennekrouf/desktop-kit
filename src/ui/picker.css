@@ -1,0 +1,73 @@
+/* The file picker: the library's files that fit, over the app. Colours come
+   from the app's --kit-* variables; the status dots from library.css. */
+.kit-pick-backdrop {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; background: rgba(0, 0, 0, 0.5);
+}
+.kit-pick-window {
+    display: flex; flex-direction: column; gap: 10px;
+    width: 100%; max-width: 620px; max-height: calc(100vh - 48px);
+    padding: 16px 18px 12px; box-sizing: border-box;
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 10px;
+    background: var(--kit-bg, var(--kit-bar, #1a1d24)); color: var(--kit-text, #e6e8ec);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+.kit-pick-window.kit-drop-over { outline: 2px dashed var(--kit-accent, #6ea8fe); outline-offset: -6px; }
+.kit-pick-head { display: flex; align-items: center; justify-content: space-between; }
+.kit-pick-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.kit-pick-close {
+    border: 0; background: none; color: var(--kit-muted, #8a909c);
+    font-size: 20px; line-height: 1; cursor: pointer;
+}
+.kit-pick-close:hover { color: var(--kit-text, #e6e8ec); }
+
+.kit-pick-list { flex: 1; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; padding: 0 6px; }
+.kit-pick-section {
+    margin: 10px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--kit-muted, #8a909c);
+}
+.kit-pick-section:first-child { margin-top: 2px; }
+.kit-pick-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 8px; border: 1px solid transparent; border-radius: 7px; cursor: pointer;
+}
+.kit-pick-row:hover, .kit-pick-row:focus { background: var(--kit-hover, rgba(255, 255, 255, 0.06)); outline: none; }
+.kit-pick-row.kit-on { border-color: var(--kit-accent, #6ea8fe); background: var(--kit-hover, rgba(255, 255, 255, 0.06)); }
+.kit-pick-kind {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+    background: var(--kit-hover, rgba(255, 255, 255, 0.06)); color: var(--kit-muted, #8a909c);
+}
+.kit-pick-video { color: #7aa7ff; }
+.kit-pick-audio { color: #c58cf0; }
+.kit-pick-image { color: #6cc7a0; }
+.kit-pick-main { flex: 1; min-width: 0; }
+.kit-pick-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kit-pick-meta { display: flex; gap: 10px; color: var(--kit-muted, #8a909c); font-size: 11.5px; overflow: hidden; white-space: nowrap; }
+.kit-pick-used { color: #e5a050; }
+.kit-pick-reason {
+    flex-shrink: 0; padding: 2px 8px; border-radius: 10px; font-size: 11px;
+    color: var(--kit-accent, #6ea8fe); background: rgba(110, 168, 254, 0.12);
+}
+/* Where a file is: there when the pointer is, and otherwise out of the way. */
+.kit-pick-where {
+    flex-shrink: 0; width: 24px; height: 24px; border: 0; border-radius: 5px;
+    background: none; color: var(--kit-muted, #8a909c); cursor: pointer; opacity: 0;
+}
+.kit-pick-row:hover .kit-pick-where { opacity: 0.7; }
+.kit-pick-where:hover { opacity: 1; background: var(--kit-hover, rgba(255, 255, 255, 0.06)); }
+.kit-pick-empty { color: var(--kit-muted, #8a909c); text-align: center; padding: 28px 12px; }
+.kit-pick-empty p { margin: 4px 0; }
+
+.kit-pick-foot {
+    display: flex; align-items: center; gap: 10px;
+    padding-top: 8px; border-top: 1px solid var(--kit-line, #2a2f3a);
+}
+.kit-pick-path {
+    flex: 1; min-width: 0; color: var(--kit-muted, #8a909c); font-size: 11px; opacity: 0.8;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left;
+}
+.kit-pick-disk { color: var(--kit-muted, #8a909c); font-size: 12px; cursor: pointer; white-space: nowrap; }
+.kit-pick-disk:hover { color: var(--kit-text, #e6e8ec); text-decoration: underline; }
