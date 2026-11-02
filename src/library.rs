@@ -692,6 +692,26 @@ pub fn day_of(at: std::time::SystemTime) -> String {
         .to_string()
 }
 
+/// When `path` was last changed, if it can be read.
+pub fn modified(path: &Path) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path).and_then(|m| m.modified()).ok()
+}
+
+/// Every entry of `dir` with when it last changed, sorted: different
+/// whenever something in the folder is added, removed or changed, so an app
+/// can tell when to sync its items again without reading them all.
+pub fn folder_stamp(dir: &Path) -> Vec<(PathBuf, Option<std::time::SystemTime>)> {
+    let mut stamp: Vec<_> = std::fs::read_dir(dir)
+        .map(|r| {
+            r.filter_map(|e| e.ok())
+                .map(|e| (e.path(), e.metadata().and_then(|m| m.modified()).ok()))
+                .collect()
+        })
+        .unwrap_or_default();
+    stamp.sort();
+    stamp
+}
+
 /// Today, local: `2026-11-02`.
 pub fn today() -> String {
     chrono::Local::now().format("%Y-%m-%d").to_string()
