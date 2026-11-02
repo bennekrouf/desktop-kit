@@ -24,31 +24,22 @@ fn named() {
 
 #[derive(Props, Clone, PartialEq)]
 struct Bar {
-    light: bool,
-    settings: bool,
     mcp: bool,
     look: Option<ProLook>,
 }
 
 #[allow(non_snake_case)]
 fn Harness(bar: Bar) -> Element {
-    let theme = Theme {
-        light: use_signal(|| bar.light),
-        picked: use_signal(|| false),
-    };
-    let on_settings = bar.settings.then(|| EventHandler::new(|_| {}));
     let on_mcp = bar.mcp.then(|| EventHandler::new(|_| {}));
     let pro = bar
         .look
         .map(|look| rsx! { ProBadge { look, title: "licence", onclick: |_| {} } });
     rsx! {
         Header {
-            theme,
-            on_settings,
+            on_settings: |_| {},
             on_mcp,
             pro,
             model: rsx! { ModelBadge { label: "Europe", region: "europe", title: "model", onclick: |_| {} } },
-            span { class: "kit-detail", "~/code/site" }
         }
     }
 }
@@ -62,51 +53,40 @@ fn render(bar: Bar) -> String {
 
 fn bar() -> Bar {
     Bar {
-        light: false,
-        settings: false,
         mcp: false,
         look: None,
     }
 }
 
 #[test]
-fn the_bar_names_the_app_and_its_version() {
+fn the_bar_is_the_flag_and_the_gear_and_nothing_of_the_app() {
     let html = render(bar());
+    assert!(html.contains("kit-flag"), "{html}");
+    assert!(html.contains(r#"title="Settings""#), "{html}");
     assert!(
-        html.contains(r#"<span class="kit-name">Desktop Kit</span>"#),
+        html.find("kit-flag") < html.find(r#"title="Settings""#),
+        "the flag, then the gear: {html}"
+    );
+    // No name, version or theme toggle: those are in Settings.
+    assert!(
+        !html.contains("kit-name") && !html.contains("v0.0.1"),
         "{html}"
     );
-    assert!(html.contains(">v0.0.1<"), "{html}");
-    assert!(html.contains("~/code/site"), "{html}");
-    assert!(
-        html.contains("kit-flag") && html.contains("Europe"),
-        "{html}"
-    );
+    assert!(!html.contains("Switch to"), "{html}");
 }
 
 #[test]
-fn feedback_is_always_there_settings_and_mcp_only_when_they_open_something() {
+fn feedback_is_always_there_mcp_only_when_it_opens_something() {
     let html = render(bar());
     assert!(html.contains(">Feedback<"), "{html}");
     assert!(html.contains("app=Desktop%20Kit"), "{html}");
-    assert!(
-        !html.contains(">MCP<") && !html.contains(">Settings<"),
-        "{html}"
-    );
+    assert!(!html.contains(">MCP<"), "{html}");
 
-    let html = render(Bar {
-        settings: true,
-        mcp: true,
-        ..bar()
-    });
+    let html = render(Bar { mcp: true, ..bar() });
     assert!(
-        html.contains(">MCP<") && html.contains(">Settings<"),
-        "{html}"
-    );
-    assert!(
-        html.find(">Settings<") < html.find(">MCP<")
+        html.find(r#"title="Settings""#) < html.find(">MCP<")
             && html.find(">MCP<") < html.find(">Feedback<"),
-        "Settings, MCP, Feedback in that order: {html}"
+        "gear, MCP, Feedback in that order: {html}"
     );
 }
 
@@ -139,14 +119,26 @@ fn the_licence_sits_last_in_the_corner() {
     assert!(html.contains("Get Pro…") && !html.contains("✦"), "{html}");
 }
 
+#[allow(non_snake_case)]
+fn SettingsHarness(light: bool) -> Element {
+    let theme = Theme {
+        light: use_signal(|| light),
+        picked: use_signal(|| false),
+    };
+    rsx! { SettingsGeneral { theme } }
+}
+
 #[test]
-fn the_toggle_offers_the_other_theme() {
-    assert!(render(bar()).contains(r#"title="Switch to light mode""#));
-    assert!(render(Bar {
-        light: true,
-        ..bar()
-    })
-    .contains(r#"title="Switch to dark mode""#));
+fn settings_show_the_theme_and_the_version() {
+    named();
+    let mut dom = VirtualDom::new_with_props(SettingsHarness, true);
+    dom.rebuild_in_place();
+    let html = dioxus_ssr::render(&dom);
+    assert!(
+        html.contains(r#"<button class="kit-on">Light</button>"#),
+        "{html}"
+    );
+    assert!(html.contains("Desktop Kit v0.0.1"), "{html}");
 }
 
 #[test]
