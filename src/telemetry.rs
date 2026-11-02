@@ -220,52 +220,13 @@ fn login_env(name: &str) -> Option<String> {
     }
 }
 
-/// `KEY=value` lines from the shell, keeping only the opt-out variables. A
-/// profile that prints its own output (nvm, conda, banners) cannot smuggle
-/// anything else in, because only these names are accepted.
-#[cfg(any(unix, test))]
-fn parse_login_env(text: &str) -> BTreeMap<String, String> {
-    text.lines()
-        .filter_map(|line| line.split_once('='))
-        .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
-        .filter(|(k, v)| !v.is_empty() && opt_out_vars().contains(k))
-        .collect()
-}
-
-#[cfg(unix)]
-fn read_login_env() -> BTreeMap<String, String> {
-    use std::process::{Command, Stdio};
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
-    let script = opt_out_vars()
-        .iter()
-        .map(|k| format!("printf '{k}=%s\\n' \"${k}\""))
-        .collect::<Vec<_>>()
-        .join("; ");
-    Command::new(shell)
-        .args(["-lc", &script])
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| parse_login_env(&String::from_utf8_lossy(&o.stdout)))
-        .unwrap_or_default()
-}
-
-/// Windows applications receive the user's environment from the system, so
-/// there is no separate login shell to ask.
-#[cfg(not(unix))]
-fn read_login_env() -> BTreeMap<String, String> {
-    BTreeMap::new()
-}
-
 /// Call once from every window's startup coroutine. Reads the login shell's
 /// opt-outs (once per process), records `AppStarted` (once per process), and
 /// says whether the notice should be shown.
 pub async fn start() -> bool {
     static STARTED: OnceLock<()> = OnceLock::new();
     if LOGIN_ENV.get().is_none() {
-        let vars = tokio::task::spawn_blocking(read_login_env)
+        let vars = tokio::task::spawn_blocking(|| crate::shell::login_vars(&opt_out_vars()))
             .await
             .unwrap_or_default();
         let _ = LOGIN_ENV.set(vars);

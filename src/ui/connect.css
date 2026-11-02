@@ -1,0 +1,24 @@
+/* The "Use it from Claude or Codex" window, in the Pro window's colours. */
+.kit-connect-window { max-width: 620px; }
+.kit-connect-step { margin: 14px 0 0; }
+.kit-connect-step h3 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; }
+.kit-connect-num {
+    display: inline-block; width: 18px; height: 18px; margin-right: 6px;
+    border-radius: 50%; text-align: center; line-height: 18px; font-size: 11px;
+    background: var(--kit-accent, #6ea8fe); color: var(--kit-bar, #1a1d24);
+}
+.kit-connect-snippet { position: relative; margin: 6px 0; }
+.kit-connect-snippet pre {
+    margin: 0; padding: 10px 70px 10px 10px; overflow-x: auto;
+    border: 1px solid var(--kit-line, #2a2f3a); border-radius: 6px;
+    background: rgba(127, 127, 127, 0.08);
+    font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-all;
+}
+.kit-connect-copy {
+    position: absolute; top: 6px; right: 6px;
+    padding: 2px 8px; border: 1px solid var(--kit-line, #2a2f3a); border-radius: 5px;
+    background: var(--kit-bar, #1a1d24); color: var(--kit-text, #e6e8ec);
+    font-size: 11.5px; cursor: pointer;
+}
+.kit-connect-window code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.kit-connect-note { margin-top: 14px; }

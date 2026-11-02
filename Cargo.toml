@@ -1,6 +1,6 @@
 [package]
 name = "desktop-kit"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 license-file = "LICENSE"
 description = "What every mayorana desktop app shares: usage statistics, the update check, the notice, the licence, and the header, banners and Pro window."
@@ -21,9 +21,12 @@ sha2 = "0.10"
 tokio = { version = "1", features = ["rt", "sync", "time", "io-std", "io-util"] }
 # Only with the `ui` feature: the header every app shows.
 dioxus = { version = "=0.7.10", default-features = false, features = ["macro", "html", "signals", "hooks", "document"], optional = true }
+# Only with the `media` feature: the request and response types the web view hands over.
+http = { version = "1", optional = true }
 
 [features]
 ui = ["dep:dioxus"]
+media = ["dep:http"]
 
 [dev-dependencies]
 dioxus-ssr = "=0.7.10"

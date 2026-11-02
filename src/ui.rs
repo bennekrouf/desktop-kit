@@ -3,7 +3,8 @@
 //! the right the app's own buttons, then the model, Settings, MCP, Feedback,
 //! the theme and, in the corner, the licence. The banners under it: a newer
 //! release, a notice, the usage-statistics question. The Pro window. And the
-//! media library and pipeline calendar the apps share.
+//! media library and pipeline calendar the apps share, and the file picker
+//! they open instead of Finder or Explorer.
 //!
 //! Its colours come from the app: each stylesheet sets the `--kit-*`
 //! variables on `body` (so `body.light` changes them too), and gives its
@@ -11,16 +12,20 @@
 //! the bar.
 
 mod banners;
+mod connect;
 mod flag;
 mod header;
 mod library;
+mod picker;
 mod pro;
 mod theme;
 
 pub use banners::Banners;
+pub use connect::ConnectWindow;
 pub use flag::RegionFlag;
 pub use header::{Header, ModelBadge, ProBadge, ProLook};
 pub use library::{open_in, use_library, LibraryView, PipelineCalendar, LIBRARY_STYLE};
+pub use picker::{FilePicker, PICKER_STYLE};
 pub use pro::{use_pro, Pro, ProButton, ProWindow};
 pub use theme::{use_theme, Theme, ThemeToggle};
 

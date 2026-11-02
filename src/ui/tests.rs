@@ -273,3 +273,34 @@ fn banners_show_nothing_until_there_is_something_to_say() {
         "{html}"
     );
 }
+
+#[allow(non_snake_case)]
+fn ConnectHarness() -> Element {
+    rsx! {
+        ConnectWindow {
+            lead: "Claude can read your things.".to_string(),
+            try_it: "“What is new?”".to_string(),
+            caution: Some("Your things go to the model.".to_string()),
+            on_close: |_| {},
+        }
+    }
+}
+
+#[test]
+fn the_connect_window_gives_every_client_its_step_and_the_app_its_words() {
+    named();
+    let mut dom = VirtualDom::new(ConnectHarness);
+    dom.rebuild_in_place();
+    let html = without_style(dioxus_ssr::render(&dom));
+    for text in [
+        "Claude can read your things.",
+        "Claude Desktop",
+        "Claude Code",
+        "Codex",
+        "Ask: “What is new?”",
+        "Your things go to the model.",
+        "claude.ai",
+    ] {
+        assert!(html.contains(text), "missing {text:?} in {html}");
+    }
+}

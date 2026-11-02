@@ -393,25 +393,6 @@ async fn old_and_unreadable_lines_are_dropped_not_sent() {
     assert!(!dir.join(QUEUE_FILE).exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
-
-#[test]
-fn only_opt_out_variables_are_taken_from_the_login_shell() {
-    let shell_output = "Now using node v20 (npm 10)\n\
-                        DO_NOT_TRACK=1\n\
-                        DISABLE_UPDATE_CHECK=\n\
-                        PATH=/usr/bin\n\
-                        MAYORANA_NO_TELEMETRY=yes\n";
-    let vars = parse_login_env(shell_output);
-    assert_eq!(vars.get("DO_NOT_TRACK").map(String::as_str), Some("1"));
-    assert_eq!(
-        vars.get("MAYORANA_NO_TELEMETRY").map(String::as_str),
-        Some("yes")
-    );
-    // Exported but empty is not set; anything outside the list is ignored.
-    assert!(!vars.contains_key("DISABLE_UPDATE_CHECK"));
-    assert!(!vars.contains_key("PATH"));
-}
-
 #[test]
 fn until_the_login_shell_has_answered_everything_counts_as_opted_out() {
     // Tests never call `start`, so the login environment is unknown here.
