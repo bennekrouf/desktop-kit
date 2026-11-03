@@ -296,3 +296,13 @@ fn the_connect_window_gives_every_client_its_step_and_the_app_its_words() {
         assert!(html.contains(text), "missing {text:?} in {html}");
     }
 }
+
+#[test]
+fn the_connect_window_brings_the_pro_window_stylesheet_it_is_drawn_with() {
+    named();
+    let mut dom = VirtualDom::new(ConnectHarness);
+    dom.rebuild_in_place();
+    let html = dioxus_ssr::render(&dom);
+    // Without it the window is unstyled and lands out of sight: MCP seems to do nothing.
+    assert!(html.contains(".kit-pro-backdrop {"), "{html}");
+}
