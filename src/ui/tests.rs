@@ -24,6 +24,7 @@ fn named() {
 
 #[derive(Props, Clone, PartialEq)]
 struct Bar {
+    flag: bool,
     mcp: bool,
     look: Option<ProLook>,
 }
@@ -34,12 +35,15 @@ fn Harness(bar: Bar) -> Element {
     let pro = bar
         .look
         .map(|look| rsx! { ProBadge { look, title: "licence", onclick: |_| {} } });
+    let model = bar.flag.then(
+        || rsx! { ModelBadge { label: "Europe", region: "europe", title: "model", onclick: |_| {} } },
+    );
     rsx! {
         Header {
             on_settings: |_| {},
             on_mcp,
             pro,
-            model: rsx! { ModelBadge { label: "Europe", region: "europe", title: "model", onclick: |_| {} } },
+            model,
         }
     }
 }
@@ -53,26 +57,34 @@ fn render(bar: Bar) -> String {
 
 fn bar() -> Bar {
     Bar {
+        flag: true,
         mcp: false,
         look: None,
     }
 }
 
 #[test]
-fn the_bar_is_the_flag_and_the_gear_and_nothing_of_the_app() {
+fn the_bar_is_the_flag_and_nothing_of_the_app() {
     let html = render(bar());
-    assert!(html.contains("kit-flag"), "{html}");
-    assert!(html.contains(r#"title="Settings""#), "{html}");
-    assert!(
-        html.find("kit-flag") < html.find(r#"title="Settings""#),
-        "the flag, then the gear: {html}"
-    );
+    assert!(html.contains(r#"aria-label="Europe""#), "{html}");
+    // The flag opens Settings: a gear beside it would be a second way to the same window.
+    assert!(!html.contains(r#"title="Settings""#), "{html}");
     // No name, version or theme toggle: those are in Settings.
     assert!(
         !html.contains("kit-name") && !html.contains("v0.0.1"),
         "{html}"
     );
     assert!(!html.contains("Switch to"), "{html}");
+}
+
+#[test]
+fn without_a_flag_the_gear_opens_settings() {
+    let html = render(Bar {
+        flag: false,
+        ..bar()
+    });
+    assert!(!html.contains(r#"aria-label="Europe""#), "{html}");
+    assert!(html.contains(r#"title="Settings""#), "{html}");
 }
 
 #[test]
@@ -84,9 +96,9 @@ fn feedback_is_always_there_mcp_only_when_it_opens_something() {
 
     let html = render(Bar { mcp: true, ..bar() });
     assert!(
-        html.find(r#"title="Settings""#) < html.find(">MCP<")
+        html.find(r#"aria-label="Europe""#) < html.find(">MCP<")
             && html.find(">MCP<") < html.find(">Feedback<"),
-        "gear, MCP, Feedback in that order: {html}"
+        "flag, MCP, Feedback in that order: {html}"
     );
 }
 

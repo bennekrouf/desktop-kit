@@ -13,6 +13,7 @@
 
 mod banners;
 mod connect;
+mod escape;
 mod flag;
 mod header;
 mod library;
@@ -23,6 +24,7 @@ mod theme;
 
 pub use banners::Banners;
 pub use connect::ConnectWindow;
+pub use escape::use_escape;
 pub use flag::RegionFlag;
 pub use header::{Header, ModelBadge, ProBadge, ProLook, Toolbar};
 pub use library::{open_in, use_library, LibraryView, PipelineCalendar, LIBRARY_STYLE};

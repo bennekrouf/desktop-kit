@@ -10,11 +10,6 @@ use crate::mcp::Connect;
 /// window's stylesheet too, whether or not the Pro window is open.
 const STYLE: &str = include_str!("connect.css");
 
-const ESCAPE_JS: &str =
-    "if (window._connectEscape) window.removeEventListener('keydown', window._connectEscape);\
-     window._connectEscape = (e) => { if (e.key === 'Escape') dioxus.send(true); };\
-     window.addEventListener('keydown', window._connectEscape);";
-
 #[component]
 pub fn ConnectWindow(
     /// What Claude can do with the app, first thing in the window.
@@ -37,12 +32,7 @@ pub fn ConnectWindow(
         codex,
         config_path,
     } = Connect::new(id);
-    use_future(move || async move {
-        let mut keys = document::eval(ESCAPE_JS);
-        while keys.recv::<bool>().await.is_ok() {
-            on_close.call(());
-        }
-    });
+    super::use_escape(on_close);
     rsx! {
         style { {super::pro::STYLE} }
         style { {STYLE} }

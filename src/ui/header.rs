@@ -5,13 +5,15 @@ use dioxus::prelude::*;
 use super::STYLE;
 use crate::licence::Status;
 
-/// The bar across the top, the same in every app: the model's flag, the gear
-/// that opens Settings, then MCP, Feedback and the licence. Nothing else: what
+/// The bar across the top, the same in every app: the model's flag, or the
+/// gear when there is no flag (the flag opens Settings itself), then MCP,
+/// Feedback and the licence. Nothing else: what
 /// an app switches between goes in a [`Toolbar`] under it, and everything it
 /// sets up goes in its Settings.
 #[component]
 pub fn Header(
-    /// The model this app runs on: a [`ModelBadge`]. None for an app without one.
+    /// The model this app runs on: a [`ModelBadge`], whose click opens
+    /// Settings. None for an app without one, which gets the gear instead.
     model: Option<Element>,
     on_settings: EventHandler<()>,
     on_mcp: Option<EventHandler<()>>,
@@ -24,7 +26,9 @@ pub fn Header(
         style { {STYLE} }
         header { class: "kit-header",
             div { class: "kit-right",
-                {model}
+                if let Some(model) = model {
+                    {model}
+                } else {
                 button {
                     class: "kit-btn kit-icon",
                     title: "Settings",
@@ -34,6 +38,7 @@ pub fn Header(
                         path { d: "M12 15a3 3 0 100-6 3 3 0 000 6z" }
                         path { d: "M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" }
                     }
+                }
                 }
                 if let Some(open) = on_mcp {
                     button {
