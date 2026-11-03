@@ -46,25 +46,13 @@ pub fn SettingsWindow(
     on_close: EventHandler<()>,
     #[props(default)] children: Element,
 ) -> Element {
+    super::use_escape(on_close);
     rsx! {
         style { {STYLE} }
         div { class: "kit-set-backdrop", onclick: move |_| on_close.call(()),
             div {
                 class: "kit-set-window",
-                // Focused when it opens, so Esc reaches it without a click first.
-                tabindex: "-1",
-                onmounted: move |e: Event<MountedData>| {
-                    spawn(async move {
-                        let _ = e.set_focus(true).await;
-                    });
-                },
                 onclick: move |e| e.stop_propagation(),
-                onkeydown: move |e| {
-                    if e.key() == Key::Escape {
-                        e.stop_propagation();
-                        on_close.call(());
-                    }
-                },
                 div { class: "kit-set-head",
                     h2 { "Settings" }
                     button { class: "kit-set-close", title: "Close (Esc)", onclick: move |_| on_close.call(()), "×" }
