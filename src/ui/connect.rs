@@ -6,6 +6,8 @@ use dioxus::prelude::*;
 
 use crate::mcp::Connect;
 
+/// Only what this window adds: it is drawn as a Pro window, so it brings that
+/// window's stylesheet too, whether or not the Pro window is open.
 const STYLE: &str = include_str!("connect.css");
 
 const ESCAPE_JS: &str =
@@ -42,6 +44,7 @@ pub fn ConnectWindow(
         }
     });
     rsx! {
+        style { {super::pro::STYLE} }
         style { {STYLE} }
         div { class: "kit-pro-backdrop", onclick: move |_| on_close.call(()),
             div {

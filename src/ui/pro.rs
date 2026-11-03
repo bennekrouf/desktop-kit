@@ -11,7 +11,7 @@ use super::{ProBadge, ProLook};
 use crate::licence::{self, FreeError, Status};
 
 /// The window's stylesheet. [`ProWindow`] adds it itself.
-const STYLE: &str = include_str!("pro.css");
+pub(super) const STYLE: &str = include_str!("pro.css");
 
 /// Sends `true` for each Escape pressed in the page. The handler is kept on
 /// `window` and replaced on each mount, so two never stack.
