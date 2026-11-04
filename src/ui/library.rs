@@ -442,8 +442,24 @@ pub fn LibraryView(
     }
 }
 
+/// Whether an item can be moved on the calendar here. A post's date is in its own file, which
+/// PublishKit changes.
+fn movable(item: &Item) -> bool {
+    !is_post(item)
+}
+
+/// `day` with `item`'s time of day kept, as [`library::set_date`] takes it.
+fn moved_date(item: &Item, day: chrono::NaiveDate) -> String {
+    let day = day.format("%Y-%m-%d");
+    match item.time() {
+        Some(t) => format!("{day}T{t}"),
+        None => day.to_string(),
+    }
+}
+
 /// A month of the pipeline: every item on its day, coloured by where it stands. A click opens
-/// it, in this app or the one that made it.
+/// it, in this app or the one that made it. An item dragged to another day moves there; ✎ (or a
+/// right-click) types its date instead.
 #[component]
 pub fn PipelineCalendar(
     here: &'static str,
@@ -451,9 +467,24 @@ pub fn PipelineCalendar(
     on_open: EventHandler<String>,
 ) -> Element {
     use chrono::{Datelike, Duration, Local, NaiveDate};
+    use dioxus::html::input_data::MouseButton;
     let today = Local::now().date_naive();
     let mut month = use_signal(|| today.with_day(1).unwrap_or(today));
     let mut error = use_signal(|| None::<String>);
+    // The item held down, while it is dragged, and the day it is over.
+    let mut held = use_signal(|| None::<Item>);
+    let mut over = use_signal(|| None::<NaiveDate>);
+    // Where the pointer is while an item is dragged: its ghost follows it. Only [`DragGhost`]
+    // reads it, so the month isn't drawn again at every move.
+    let mut pointer = use_signal(|| None::<(f64, f64)>);
+    // The item whose date is being typed: it, the day and the time.
+    let mut editing = use_signal(|| None::<(Item, String, String)>);
+
+    let mut move_to = move |id: &str, date: &str| {
+        let moved = library::set_date(id, date).map_err(|e| format!("Couldn't move it: {e}"));
+        error.set(moved.err());
+        items.set(library::load_all());
+    };
 
     let first = month();
     let next = first
@@ -469,6 +500,11 @@ pub fn PipelineCalendar(
         on.sort_by(|a, b| a.date.cmp(&b.date));
         on
     };
+    let dragging = held.read().is_some();
+    let ghost = held
+        .read()
+        .as_ref()
+        .map(|i| (i.status.key(), i.title.clone()));
 
     rsx! {
         style { {LIBRARY_STYLE} }
@@ -492,30 +528,149 @@ pub fn PipelineCalendar(
                     }
                 }
             }
+            if let Some((item, day, time)) = editing() {
+                div { class: "kit-lib-plan kit-cal-edit",
+                    span { class: "kit-cal-edit-title", "Move “{item.title}” to" }
+                    input {
+                        class: "kit-lib-select",
+                        r#type: "date",
+                        value: "{day}",
+                        oninput: move |e| {
+                            if let Some(p) = editing.write().as_mut() {
+                                p.1 = e.value();
+                            }
+                        },
+                    }
+                    input {
+                        class: "kit-lib-select",
+                        r#type: "time",
+                        title: "Leave empty for the whole day",
+                        value: "{time}",
+                        oninput: move |e| {
+                            if let Some(p) = editing.write().as_mut() {
+                                p.2 = e.value();
+                            }
+                        },
+                    }
+                    button {
+                        class: "kit-chip kit-on",
+                        disabled: day.is_empty(),
+                        onclick: move |_| {
+                            let Some((item, day, time)) = editing.peek().clone() else { return };
+                            let date = if time.is_empty() { day.clone() } else { format!("{day}T{}", time.get(..5).unwrap_or(&time)) };
+                            move_to(&item.id, &date);
+                            if error.peek().is_none() {
+                                editing.set(None);
+                                if let Ok(d) = NaiveDate::parse_from_str(&day, "%Y-%m-%d") {
+                                    month.set(d.with_day(1).unwrap_or(d));
+                                }
+                            }
+                        },
+                        "Move"
+                    }
+                    button { class: "kit-chip", onclick: move |_| editing.set(None), "Cancel" }
+                }
+            }
             if let Some(e) = error() {
                 p { class: "kit-lib-error", "{e}" }
             }
-            div { class: "kit-cal-grid",
+            div {
+                class: if dragging { "kit-cal-grid kit-cal-dragging" } else { "kit-cal-grid" },
+                onmouseleave: move |_| {
+                    held.set(None);
+                    over.set(None);
+                    pointer.set(None);
+                },
+                onmousemove: move |e| {
+                    if held.peek().is_some() {
+                        let at = e.client_coordinates();
+                        pointer.set(Some((at.x, at.y)));
+                    }
+                },
+                onmouseup: move |_| pointer.set(None),
+                if let Some((status, title)) = ghost {
+                    DragGhost { pointer, class: format!("kit-cal-item kit-cal-ghost kit-status-{status}"), title }
+                }
                 for name in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] {
                     div { class: "kit-cal-head", "{name}" }
                 }
                 for day in days {
                     div {
-                        class: if day.month() != first.month() { "kit-cal-day kit-cal-out" } else if day == today { "kit-cal-day kit-cal-today" } else { "kit-cal-day" },
+                        class: format!(
+                            "kit-cal-day{}{}{}",
+                            if day.month() != first.month() { " kit-cal-out" } else { "" },
+                            if day == today { " kit-cal-today" } else { "" },
+                            if over() == Some(day) { " kit-cal-drop" } else { "" },
+                        ),
+                        onmouseenter: move |_| {
+                            if held.peek().is_some() {
+                                over.set(Some(day));
+                            }
+                        },
+                        onmouseup: move |_| {
+                            over.set(None);
+                            let Some(item) = held.take() else { return };
+                            if item.day() != day.format("%Y-%m-%d").to_string() {
+                                move_to(&item.id, &moved_date(&item, day));
+                            }
+                        },
                         span { class: "kit-cal-num", "{day.day()}" }
                         for item in on(day) {
                             {
                                 let open = item.clone();
+                                let grab = item.clone();
+                                let edit = item.clone();
+                                let right = item.clone();
+                                let can_move = movable(&item);
+                                let is_held = held.read().as_ref().is_some_and(|h| h.id == item.id);
+                                let tip = if can_move {
+                                    format!("{} · {} · {} — drag it to another day to move it", kind_label(&item), owner(&item), item.status.label())
+                                } else {
+                                    format!("{} · {} · {} — move it in PublishKit", kind_label(&item), owner(&item), item.status.label())
+                                };
+                                let mut start_edit = move |item: &Item| {
+                                    error.set(None);
+                                    editing.set(Some((item.clone(), item.day().to_string(), item.time().unwrap_or_default().to_string())));
+                                };
                                 rsx! {
-                                    button {
-                                        class: "kit-cal-item kit-status-{item.status.key()}",
+                                    div {
+                                        class: format!(
+                                            "kit-cal-item kit-status-{}{}{}",
+                                            item.status.key(),
+                                            if can_move { " kit-cal-movable" } else { "" },
+                                            if is_held { " kit-cal-held" } else { "" },
+                                        ),
                                         key: "{item.id}",
-                                        title: "{kind_label(&item)} · {owner(&item)} · {item.status.label()}",
+                                        role: "button",
+                                        title: "{tip}",
+                                        onmousedown: move |e| {
+                                            if can_move && e.trigger_button() == Some(MouseButton::Primary) {
+                                                held.set(Some(grab.clone()));
+                                            }
+                                        },
                                         onclick: move |_| error.set(open_item(here, &open, &on_open).err()),
+                                        oncontextmenu: move |e| {
+                                            if can_move {
+                                                e.prevent_default();
+                                                start_edit(&right);
+                                            }
+                                        },
                                         if let Some(t) = item.time() {
                                             span { class: "kit-cal-time", "{t}" }
                                         }
-                                        "{item.title}"
+                                        span { class: "kit-cal-label", "{item.title}" }
+                                        if can_move {
+                                            span {
+                                                class: "kit-cal-pen",
+                                                title: "Change its date",
+                                                onmousedown: move |e| e.stop_propagation(),
+                                                onclick: move |e| {
+                                                    e.stop_propagation();
+                                                    start_edit(&edit);
+                                                },
+                                                "✎"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -523,6 +678,23 @@ pub fn PipelineCalendar(
                     }
                 }
             }
+        }
+    }
+}
+
+/// The card being dragged, under the pointer: drawn on its own, so only it follows each move.
+/// It lets the pointer through, to the day it would land on. Nothing shows until the pointer
+/// moves, so a click doesn't flash it.
+#[component]
+pub fn DragGhost(pointer: Signal<Option<(f64, f64)>>, class: String, title: String) -> Element {
+    let Some((x, y)) = pointer() else {
+        return rsx! {};
+    };
+    rsx! {
+        div {
+            class: "{class}",
+            style: "position: fixed; left: {x + 12.0}px; top: {y + 8.0}px; pointer-events: none;",
+            "{title}"
         }
     }
 }

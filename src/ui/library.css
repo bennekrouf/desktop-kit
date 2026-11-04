@@ -100,6 +100,26 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .kit-cal-item:hover { filter: brightness(1.2); }
+.kit-cal-item { display: flex; align-items: center; }
+.kit-cal-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.kit-cal-movable { cursor: grab; }
+.kit-cal-pen {
+    flex: none; margin-left: 4px; padding: 0 2px; border-radius: 3px;
+    color: var(--kit-muted, #8a909c); cursor: pointer; visibility: hidden;
+}
+.kit-cal-item:hover .kit-cal-pen { visibility: visible; }
+.kit-cal-pen:hover { color: inherit; background: var(--kit-hover, rgba(255, 255, 255, 0.1)); }
+/* While an item is dragged: no text selected on the way, and the day it would land on marked. */
+.kit-cal-grid { -webkit-user-select: none; user-select: none; }
+.kit-cal-dragging, .kit-cal-dragging .kit-cal-item { cursor: grabbing; }
+.kit-cal-held { opacity: 0.45; }
+.kit-cal-ghost {
+    width: 180px; z-index: 1000; opacity: 0.92; cursor: grabbing;
+    background: var(--kit-bar, #1a1d24); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.kit-cal-drop { box-shadow: inset 0 0 0 2px var(--kit-accent, #6ea8fe); }
+.kit-cal-edit { align-items: center; margin-bottom: 8px; }
+.kit-cal-edit-title { font-size: 12.5px; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kit-cal-time { color: var(--kit-muted, #8a909c); margin-right: 4px; font-variant-numeric: tabular-nums; }
 
 .kit-lib-plan { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; padding: 10px 12px; border: 1px dashed var(--kit-line, #2a2f3a); border-radius: 8px; }

@@ -27,7 +27,7 @@ pub use connect::ConnectWindow;
 pub use escape::use_escape;
 pub use flag::RegionFlag;
 pub use header::{Header, ModelBadge, ProBadge, ProLook, Toolbar};
-pub use library::{open_in, use_library, LibraryView, PipelineCalendar, LIBRARY_STYLE};
+pub use library::{open_in, use_library, DragGhost, LibraryView, PipelineCalendar, LIBRARY_STYLE};
 pub use picker::{FilePicker, PICKER_STYLE};
 pub use pro::{use_pro, Pro, ProButton, ProWindow};
 pub use settings::{SettingsGeneral, SettingsWindow};

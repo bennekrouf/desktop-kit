@@ -318,3 +318,48 @@ fn the_connect_window_brings_the_pro_window_stylesheet_it_is_drawn_with() {
     // Without it the window is unstyled and lands out of sight: MCP seems to do nothing.
     assert!(html.contains(".kit-pro-backdrop {"), "{html}");
 }
+
+#[allow(non_snake_case)]
+fn CalendarHarness(items: Vec<crate::library::Item>) -> Element {
+    let items = use_signal(|| items);
+    rsx! { PipelineCalendar { here: "polishcast", items, on_open: |_| {} } }
+}
+
+#[test]
+fn recordings_can_be_moved_on_the_calendar_and_posts_cannot() {
+    use crate::library::{Item, Kind, Status};
+    let day = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let mut take = Item::new(
+        "polishcast:demo",
+        "polishcast",
+        Kind::Video,
+        "Demo take",
+        Status::Ready,
+    );
+    take.date = format!("{day}T09:30");
+    let mut post = Item::new(
+        "publishkit:/s::x::en::a.md",
+        "publishkit",
+        Kind::Social,
+        "Launch post",
+        Status::Queued,
+    );
+    post.date = day;
+    let mut dom = VirtualDom::new_with_props(CalendarHarness, vec![take, post]);
+    dom.rebuild_in_place();
+    let html = dioxus_ssr::render(&dom);
+    let item = |title: &str| {
+        let at = html.find(title).unwrap();
+        let start = html[..at].rfind("<div class=\"kit-cal-item").unwrap();
+        let end = at + html[at..].find("</div>").unwrap();
+        html[start..end].to_string()
+    };
+    let take = item("Demo take");
+    assert!(take.contains("kit-cal-movable"), "{take}");
+    assert!(take.contains("09:30"), "{take}");
+    assert!(take.contains("✎"), "{take}");
+    let post = item("Launch post");
+    assert!(!post.contains("kit-cal-movable"), "{post}");
+    assert!(!post.contains("✎"), "{post}");
+    assert!(post.contains("move it in PublishKit"), "{post}");
+}
