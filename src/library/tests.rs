@@ -183,3 +183,29 @@ fn a_planned_idea_hands_its_notes_to_what_was_made() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn an_item_moved_to_another_day_stays_there_until_its_work_moves_on() {
+    let dir = scratch("move");
+    upsert_in(&dir, take(Status::Polishing)).unwrap();
+    set_date_in(&dir, "polishcast:take-1", "2026-12-01T10:30").unwrap();
+    assert_eq!(read(&dir, "polishcast:take-1").date, "2026-12-01T10:30");
+
+    // The app syncs again with nothing new: the day stays.
+    upsert_in(&dir, take(Status::Polishing)).unwrap();
+    assert_eq!(read(&dir, "polishcast:take-1").day(), "2026-12-01");
+
+    assert!(set_date_in(&dir, "polishcast:take-1", "next week").is_err());
+    assert!(set_date_in(&dir, "polishcast:take-1", "2026-13-01").is_err());
+
+    let post = Item::new(
+        "publishkit:/site::x::en::a.md",
+        "publishkit",
+        Kind::Social,
+        "A",
+        Status::Queued,
+    );
+    upsert_in(&dir, post).unwrap();
+    assert!(set_date_in(&dir, "publishkit:/site::x::en::a.md", "2026-12-01").is_err());
+    let _ = std::fs::remove_dir_all(&dir);
+}

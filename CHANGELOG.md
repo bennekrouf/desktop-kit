@@ -5,6 +5,15 @@ branch, with no tag or version in between, so a change reaches every app with
 its next build. What a user will notice belongs in each app's own CHANGELOG.md,
 in the pull request that takes the change; this file is the kit's history.
 
+## [Unreleased]
+
+### Added
+
+- The pipeline calendar moves items: drag one to another day, or type its date
+  with ✎ or a right-click. `library::set_date` keeps the new day; posts are
+  refused, as their date is in their own file. `DragGhost` draws the card
+  under the pointer while it is dragged.
+
 ## [0.1.8]
 
 ### Changed

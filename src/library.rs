@@ -454,6 +454,36 @@ fn set_status_in(dir: &Path, id: &str, status: Status) -> std::io::Result<()> {
     })
 }
 
+/// Moves an item to another day on the calendar: `2026-11-05`, or with the time,
+/// `2026-11-05T09:00`. Not for a post: its date is in its own file, which PublishKit changes.
+/// A recording keeps the day until its work moves on to the next status.
+pub fn set_date(id: &str, date: &str) -> std::io::Result<()> {
+    set_date_in(&need_dir()?, id, date)
+}
+
+fn set_date_in(dir: &Path, id: &str, date: &str) -> std::io::Result<()> {
+    let date = date.trim();
+    let valid = match date.len() {
+        10 => chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok(),
+        16 => chrono::NaiveDateTime::parse_from_str(date, "%Y-%m-%dT%H:%M").is_ok(),
+        _ => false,
+    };
+    if !valid {
+        return Err(std::io::Error::other(format!(
+            "a date is like 2026-11-05 or 2026-11-05T09:00, not {date}"
+        )));
+    }
+    let path = file_of(dir, id);
+    let item: Item =
+        serde_json::from_slice(&std::fs::read(&path)?).map_err(std::io::Error::other)?;
+    if matches!(item.kind, Kind::Blog | Kind::Social) {
+        return Err(std::io::Error::other(
+            "a post's date is in its own file: move it in PublishKit",
+        ));
+    }
+    change(dir, id, |item| item.date = date.to_string())
+}
+
 pub fn set_notes(id: &str, notes: &str) -> std::io::Result<()> {
     change(&need_dir()?, id, |item| {
         item.notes = notes.trim().to_string()
