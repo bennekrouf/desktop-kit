@@ -102,6 +102,8 @@
 .kit-cal-item:hover { filter: brightness(1.2); }
 .kit-cal-item { display: flex; align-items: center; }
 .kit-cal-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The card itself takes the press, so where it was grabbed is measured from its corner. */
+.kit-cal-time, .kit-cal-label { pointer-events: none; }
 .kit-cal-movable { cursor: grab; }
 .kit-cal-pen {
     flex: none; margin-left: 4px; padding: 0 2px; border-radius: 3px;

@@ -477,6 +477,12 @@ pub fn PipelineCalendar(
     // Where the pointer is while an item is dragged: its ghost follows it. Only [`DragGhost`]
     // reads it, so the month isn't drawn again at every move.
     let mut pointer = use_signal(|| None::<(f64, f64)>);
+    // Where the card was pressed: the pointer then, and the point of the card under it, so the
+    // ghost stays held at that point. `dragged` is set once the pointer has really moved, so the
+    // click that ends a drag doesn't open the item.
+    let mut press = use_signal(|| None::<(f64, f64)>);
+    let mut grip = use_signal(|| (0.0_f64, 0.0_f64));
+    let mut dragged = use_signal(|| false);
     // The item whose date is being typed: it, the day and the time.
     let mut editing = use_signal(|| None::<(Item, String, String)>);
 
@@ -584,12 +590,20 @@ pub fn PipelineCalendar(
                 onmousemove: move |e| {
                     if held.peek().is_some() {
                         let at = e.client_coordinates();
-                        pointer.set(Some((at.x, at.y)));
+                        let far = press
+                            .peek()
+                            .is_some_and(|(x, y)| (at.x - x).abs() + (at.y - y).abs() > 4.0);
+                        if far && !*dragged.peek() {
+                            dragged.set(true);
+                        }
+                        if *dragged.peek() {
+                            pointer.set(Some((at.x, at.y)));
+                        }
                     }
                 },
                 onmouseup: move |_| pointer.set(None),
                 if let Some((status, title)) = ghost {
-                    DragGhost { pointer, class: format!("kit-cal-item kit-cal-ghost kit-status-{status}"), title }
+                    DragGhost { pointer, grip: grip(), class: format!("kit-cal-item kit-cal-ghost kit-status-{status}"), title }
                 }
                 for name in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] {
                     div { class: "kit-cal-head", "{name}" }
@@ -644,11 +658,23 @@ pub fn PipelineCalendar(
                                         role: "button",
                                         title: "{tip}",
                                         onmousedown: move |e| {
+                                            dragged.set(false);
                                             if can_move && e.trigger_button() == Some(MouseButton::Primary) {
+                                                let at = e.client_coordinates();
+                                                let inside = e.element_coordinates();
+                                                press.set(Some((at.x, at.y)));
+                                                grip.set((inside.x.min(GHOST_WIDTH - 10.0), inside.y));
                                                 held.set(Some(grab.clone()));
                                             }
                                         },
-                                        onclick: move |_| error.set(open_item(here, &open, &on_open).err()),
+                                        onclick: move |_| {
+                                            // A drag ends with a click on the card: it only moves it.
+                                            if *dragged.peek() {
+                                                dragged.set(false);
+                                                return;
+                                            }
+                                            error.set(open_item(here, &open, &on_open).err());
+                                        },
                                         oncontextmenu: move |e| {
                                             if can_move {
                                                 e.prevent_default();
@@ -682,18 +708,28 @@ pub fn PipelineCalendar(
     }
 }
 
+/// The ghost's width, as `.kit-cal-ghost` sets it.
+const GHOST_WIDTH: f64 = 180.0;
+
 /// The card being dragged, under the pointer: drawn on its own, so only it follows each move.
-/// It lets the pointer through, to the day it would land on. Nothing shows until the pointer
-/// moves, so a click doesn't flash it.
+/// `grip` is the point of the card that was pressed, kept under the pointer. It lets the pointer
+/// through, to the day it would land on. Nothing shows until the pointer moves, so a click
+/// doesn't flash it.
 #[component]
-pub fn DragGhost(pointer: Signal<Option<(f64, f64)>>, class: String, title: String) -> Element {
+pub fn DragGhost(
+    pointer: Signal<Option<(f64, f64)>>,
+    grip: (f64, f64),
+    class: String,
+    title: String,
+) -> Element {
     let Some((x, y)) = pointer() else {
         return rsx! {};
     };
+    let (gx, gy) = grip;
     rsx! {
         div {
             class: "{class}",
-            style: "position: fixed; left: {x + 12.0}px; top: {y + 8.0}px; pointer-events: none;",
+            style: "position: fixed; left: {x - gx}px; top: {y - gy}px; pointer-events: none;",
             "{title}"
         }
     }
