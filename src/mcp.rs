@@ -225,6 +225,44 @@ impl Connect {
     }
 }
 
+/// Claude Desktop's config file on this computer, where [`Connect::config_path`] names it.
+pub fn desktop_config_file() -> Option<std::path::PathBuf> {
+    let base = if cfg!(target_os = "macos") {
+        dirs::home_dir()?.join("Library/Application Support")
+    } else {
+        // %APPDATA% on Windows, ~/.config on Linux.
+        dirs::config_dir()?
+    };
+    Some(base.join("Claude").join("claude_desktop_config.json"))
+}
+
+/// Opens Claude Desktop's config file in a text editor, making an empty one first if Claude
+/// hasn't written it yet. Its settings no longer have a menu item that does this.
+pub fn open_desktop_config() -> Result<(), String> {
+    let path = desktop_config_file().ok_or("Couldn't find your home folder.")?;
+    if !path.exists() {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)
+                .map_err(|e| format!("Couldn't make {}: {e}", dir.display()))?;
+        }
+        std::fs::write(&path, "{\n  \"mcpServers\": {}\n}\n")
+            .map_err(|e| format!("Couldn't make {}: {e}", path.display()))?;
+    }
+    // `open -t`: a .json file would otherwise go to whatever claims JSON (often Xcode).
+    #[cfg(target_os = "macos")]
+    let spawned = std::process::Command::new("open")
+        .arg("-t")
+        .arg(&path)
+        .spawn();
+    #[cfg(windows)]
+    let spawned = std::process::Command::new("notepad").arg(&path).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let spawned = std::process::Command::new("xdg-open").arg(&path).spawn();
+    spawned
+        .map(|_| ())
+        .map_err(|e| format!("Couldn't open {}: {e}", path.display()))
+}
+
 /// Writes one message. One per line, and nothing else ever on stdout: the
 /// client reads it as the protocol, so a stray print is a corrupt message.
 pub fn write(message: &Value) {
