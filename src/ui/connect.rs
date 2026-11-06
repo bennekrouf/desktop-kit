@@ -32,6 +32,7 @@ pub fn ConnectWindow(
         codex,
         config_path,
     } = Connect::new(id);
+    let mut open_error = use_signal(|| None::<String>);
     super::use_escape(on_close);
     rsx! {
         style { {super::pro::STYLE} }
@@ -48,21 +49,34 @@ pub fn ConnectWindow(
                     p { "{lead}" }
                     {extra}
                     div { class: "kit-connect-step",
-                        h3 { span { class: "kit-connect-num", "1" } "Claude Desktop" }
+                        h3 { span { class: "kit-connect-num", "1" } "Claude Desktop \u{2013} Chat" }
                         p { class: "kit-pro-hint",
-                            "Settings \u{2192} Developer \u{2192} Edit Config, paste this in and save, then quit Claude \
-                             and open it again. If the file already has an "
+                            "Open Claude\u{2019}s config file, paste this in and save, then quit Claude completely \
+                             and open it again. {name} then shows under Connectors. If the file already has an "
                             code { "mcpServers" }
                             " section, add just the "
                             code { "{id}" }
                             " entry to it."
                         }
                         Snippet { text: desktop }
-                        p { class: "kit-pro-hint", "The file: {config_path}" }
+                        p { class: "kit-pro-hint",
+                            "The file: {config_path} "
+                            button {
+                                class: "kit-connect-copy",
+                                onclick: move |_| open_error.set(crate::mcp::open_desktop_config().err()),
+                                "Open config file"
+                            }
+                        }
+                        if let Some(why) = open_error() {
+                            p { class: "kit-pro-hint", "{why}" }
+                        }
                     }
                     div { class: "kit-connect-step",
-                        h3 { span { class: "kit-connect-num", "2" } "Claude Code" }
-                        p { class: "kit-pro-hint", "Run this once in a terminal:" }
+                        h3 { span { class: "kit-connect-num", "2" } "Claude Code \u{2013} terminal and the desktop app\u{2019}s Code tab" }
+                        p { class: "kit-pro-hint",
+                            "Run this once in a terminal. It connects the claude command and the Code tab, not the \
+                             Chat side above. If it says the server already exists, it is already connected there."
+                        }
                         Snippet { text: code }
                     }
                     div { class: "kit-connect-step",
