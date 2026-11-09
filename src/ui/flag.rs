@@ -3,6 +3,14 @@
 
 use dioxus::prelude::*;
 
+/// The ids of the regions api0 has not opened yet, asked once when the
+/// component mounts ([`crate::region::closed`]); empty until api0 answers.
+pub fn use_closed_regions() -> Signal<Vec<String>> {
+    let mut closed = use_signal(Vec::new);
+    use_future(move || async move { closed.set(crate::region::closed().await) });
+    closed
+}
+
 /// A region's flag, by [`crate::region::Region::id`]; grey for an id it doesn't know.
 #[component]
 pub fn RegionFlag(id: &'static str) -> Element {

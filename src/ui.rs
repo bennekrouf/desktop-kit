@@ -25,7 +25,7 @@ mod theme;
 pub use banners::Banners;
 pub use connect::ConnectWindow;
 pub use escape::use_escape;
-pub use flag::RegionFlag;
+pub use flag::{use_closed_regions, RegionFlag};
 pub use header::{Header, ModelBadge, ProBadge, ProLook, Toolbar};
 pub use library::{open_in, use_library, DragGhost, LibraryView, PipelineCalendar, LIBRARY_STYLE};
 pub use picker::{FilePicker, PICKER_STYLE};

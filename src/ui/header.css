@@ -154,6 +154,7 @@
     background: transparent; color: var(--kit-muted, #8a909c);
     font: inherit; font-size: 12.5px; cursor: pointer;
 }
+.kit-set-seg button:disabled { opacity: 0.45; cursor: default; }
 .kit-set-seg button.kit-on { background: var(--kit-hover, rgba(255, 255, 255, 0.06)); color: var(--kit-text, #e6e8ec); }
 .kit-set-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
 .kit-set-btn {
