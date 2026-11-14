@@ -7,6 +7,12 @@ in the pull request that takes the change; this file is the kit's history.
 
 ## [Unreleased]
 
+### Fixed
+
+- The release workflow waits and tries the upload to mayorana.ch again when
+  another app's release is uploading at the same moment, instead of failing:
+  the server lets one upload in at a time.
+
 ### Added
 
 - The pipeline calendar moves items: drag one to another day, or type its date
