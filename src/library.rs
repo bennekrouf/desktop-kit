@@ -198,6 +198,10 @@ pub struct Item {
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub links: Vec<Link>,
+    /// The planned ideas it was made for, by their ids. They left the library when it took them
+    /// over ([`fulfil`]); whatever pointed at one (a weekly goal in MiniCRM) follows it here.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plans: Vec<String>,
     /// Its day on the calendar, local: `2026-11-02`, or with the time, `2026-11-02T09:00`. A
     /// post's planned or actual date; for media, when its status last changed.
     pub date: String,
@@ -236,6 +240,7 @@ impl Item {
             files: Vec::new(),
             tags: Vec::new(),
             links: Vec::new(),
+            plans: Vec::new(),
             date: today(),
             open: String::new(),
             notes: String::new(),
@@ -409,6 +414,11 @@ fn upsert_in(dir: &Path, mut item: Item) -> std::io::Result<Item> {
                 item.links.push(l.clone());
             }
         }
+        for p in &old.plans {
+            if !item.plans.contains(p) {
+                item.plans.push(p.clone());
+            }
+        }
         if item.notes.is_empty() {
             item.notes.clone_from(&old.notes);
         }
@@ -529,7 +539,8 @@ fn plan_in(
 }
 
 /// What was made for a planned idea (`into`, a take, a recording, a post) takes over its
-/// notes, tags and links, and the idea leaves the calendar. Gives the item as it is now.
+/// notes, tags and links, and the idea leaves the calendar; its id stays in [`Item::plans`].
+/// Gives the item as it is now.
 pub fn fulfil(plan: &str, into: &str) -> std::io::Result<Item> {
     fulfil_in(&need_dir()?, plan, into)
 }
@@ -558,6 +569,11 @@ fn fulfil_in(dir: &Path, plan: &str, into: &str) -> std::io::Result<Item> {
     for l in idea.links {
         if !item.links.iter().any(|n| n.target == l.target) {
             item.links.push(l);
+        }
+    }
+    for p in idea.plans.into_iter().chain([plan.to_string()]) {
+        if !item.plans.contains(&p) {
+            item.plans.push(p);
         }
     }
     item.updated = now();

@@ -174,6 +174,11 @@ fn a_planned_idea_hands_its_notes_to_what_was_made() {
     let made = fulfil_in(&dir, &idea.id, "polishcast:take-1").unwrap();
     assert_eq!(made.notes, "1. Open\n2. Export");
     assert_eq!(made.tags, ["launch"]);
+    assert_eq!(
+        made.plans,
+        std::slice::from_ref(&idea.id),
+        "what pointed at the idea can find it"
+    );
     assert_eq!(load_in(&dir).len(), 1, "the idea is gone");
     // The app saving the take again keeps them.
     let again = upsert_in(&dir, take(Status::Ready)).unwrap();
@@ -181,6 +186,7 @@ fn a_planned_idea_hands_its_notes_to_what_was_made() {
         (again.notes.as_str(), again.status),
         ("1. Open\n2. Export", Status::Ready)
     );
+    assert_eq!(again.plans, std::slice::from_ref(&idea.id));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
