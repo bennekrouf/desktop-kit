@@ -625,9 +625,29 @@ jobs:
           fi
           chmod 600 ~/.ssh/known_hosts
           SSH="ssh -i $HOME/.ssh/dist_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          # rrsync on the server lets one upload in at a time: another app's
+          # release publishing at the same moment is turned away with
+          # "Another instance of rrsync is already accessing this directory"
+          # (TrackCut v0.1.68, beside PolishCast v0.1.66). Wait for it and try
+          # again, for up to about eight minutes; any other failure stops here.
+          upload() {
+            local log try
+            log=$(mktemp)
+            for try in 1 2 3 4 5 6 7 8 9 10; do
+              if rsync "$@" 2>&1 | tee "$log"; then
+                return 0
+              fi
+              grep -q 'Another instance of rrsync' "$log" || return 1
+              [ "$try" -lt 10 ] || break
+              echo "::notice::Another release is uploading to $SSH_HOST; trying again in $((try * 10))s ($try/10)."
+              sleep $((try * 10))
+            done
+            echo "::error::The server stayed busy with another upload; re-run this job once it is done."
+            return 1
+          }
           # Versioned copy first: if latest/ then fails, the release is still
           # reachable at its immutable URL.
-          rsync -av --chmod=F644 -e "$SSH" release/ "$SSH_USER@$SSH_HOST:$ROOT/$TAG/"
+          upload -av --chmod=F644 -e "$SSH" release/ "$SSH_USER@$SSH_HOST:$ROOT/$TAG/"
           # A run that finishes late must not roll latest/ back: v0.1.18's
           # release job ran hours after v0.1.19's and replaced it with a build
           # that had no DMG.
@@ -639,7 +659,7 @@ jobs:
             echo "::warning::latest/ already serves $PUBLISHED, newer than $VER — leaving it; $TAG is at $ROOT/$TAG/."
             exit 0
           fi
-          rsync -av --delete --chmod=F644 -e "$SSH" release/ "$SSH_USER@$SSH_HOST:$ROOT/latest/"
+          upload -av --delete --chmod=F644 -e "$SSH" release/ "$SSH_USER@$SSH_HOST:$ROOT/latest/"
           echo "Published $TAG → $SSH_HOST:$ROOT/{$TAG,latest}/"
 
       # ── Public release: notes + manifest only, no binaries ─────────────────
