@@ -13,6 +13,10 @@ in the pull request that takes the change; this file is the kit's history.
   with ✎ or a right-click. `library::set_date` keeps the new day; posts are
   refused, as their date is in their own file. `DragGhost` draws the card
   under the pointer while it is dragged.
+- `Item::plans`: the planned ideas an item was made for. `library::fulfil`
+  records the idea's id there before it leaves the library, and `upsert` keeps
+  it, so what pointed at the idea (a weekly goal in MiniCRM) can follow it to
+  the take or post.
 
 ## [0.1.8]
 
