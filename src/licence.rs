@@ -11,7 +11,9 @@
 //! ```
 //!
 //! and keeps the last answer on disk, so an app started offline reads the last
-//! one: Pro lasts [`GRACE`] after the last check that got through. The number
+//! one: Pro lasts [`GRACE`] after the last check that got through. api0 signs
+//! its answer, and a saved answer whose signature doesn't check counts as none
+//! ([`seal`]: what is signed, and until when an unsigned one counts). The number
 //! itself goes in the file every Mayorana app shares ([`load_shared`]), so it
 //! is typed once per computer.
 //!
@@ -23,6 +25,7 @@
 //! is not always its name (PolishCast is `small-video`).
 
 mod online;
+pub mod seal;
 
 pub use online::{
     activate, buy_url, check, current, deactivate, portal_url, refresh, request_free_credits,
@@ -109,6 +112,18 @@ pub struct Answer {
     pub credits: Credits,
     #[serde(default)]
     pub checked_at: String,
+    /// When api0 gave the answer (seconds since 1970, api0's clock): what Pro
+    /// is counted from offline, as it is signed and this computer's `checked`
+    /// isn't.
+    #[serde(default)]
+    pub issued_at: u64,
+    /// The answer as the exact JSON text api0 signed. The fields above are
+    /// read from it once [`seal`] has checked `signature`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub signed: String,
+    /// api0's Ed25519 signature over `signed`, in base64.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub signature: String,
 }
 
 impl Answer {
@@ -252,26 +267,71 @@ pub fn free_reply(status: u16, body: &str) -> Result<String, FreeError> {
     }
 }
 
-/// What `saved` amounts to for `product` at `now` (seconds since 1970).
+/// What `saved` amounts to for `product` at `now` (seconds since 1970). An
+/// answer whose signature doesn't check counts as none ([`seal`]).
 pub fn status_at(saved: Option<&Saved>, now: u64, product: &str) -> Status {
+    status_with(saved, now, product, seal::PUBLIC_KEY)
+}
+
+fn status_with(saved: Option<&Saved>, now: u64, product: &str, key: &str) -> Status {
     let Some(saved) = saved else {
         return Status::Free;
     };
-    let Some(answer) = saved.answer.clone() else {
+    let Some((answer, checked)) = trusted(saved, now, key) else {
         return Status::Unknown(saved.licence.clone());
     };
     if !answer.unlocks_for(product) {
         Status::NotPro(answer)
-    } else if now.saturating_sub(saved.checked) > GRACE.as_secs() {
+    } else if now.saturating_sub(checked) > GRACE.as_secs() {
         Status::Offline(answer)
     } else {
         Status::Pro(answer)
     }
 }
 
+/// `saved`'s answer, if it can be trusted at `now`, and when the check that
+/// gave it was: for a signed answer, never later than api0 says it gave it,
+/// so editing `checked` doesn't make Pro last.
+fn trusted(saved: &Saved, now: u64, key: &str) -> Option<(Answer, u64)> {
+    let opened = seal::open(saved.answer.as_ref()?, &saved.licence, now, key)?;
+    let checked = opened
+        .issued_at
+        .map_or(saved.checked, |at| at.min(saved.checked));
+    Some((opened.answer, checked))
+}
+
+/// `saved` as read from disk, with only what can be trusted at `now`: the
+/// answer as api0 signed it, or none, and then not checked yet, so the app
+/// asks api0 again.
+pub fn verified(saved: Saved, now: u64) -> Saved {
+    verified_with(saved, now, seal::PUBLIC_KEY)
+}
+
+fn verified_with(mut saved: Saved, now: u64, key: &str) -> Saved {
+    let Some(answer) = saved.answer.take() else {
+        return saved;
+    };
+    match seal::open(&answer, &saved.licence, now, key) {
+        Some(opened) => saved.answer = Some(opened.answer),
+        None => saved.checked = 0,
+    }
+    saved
+}
+
+/// api0's reply to `GET /v1/licence` about `licence`, read at `now`: the
+/// answer as api0 signed it, or why it can't be used.
+fn read_answer(body: &str, licence: &str, now: u64, key: &str) -> Result<Answer, String> {
+    let answer: Answer =
+        serde_json::from_str(body).map_err(|_| "api0's answer couldn't be read".to_string())?;
+    seal::open(&answer, licence, now, key)
+        .map(|opened| opened.answer)
+        .ok_or_else(|| "api0's answer wasn't signed by api0".to_string())
+}
+
 /// Whether the last check is old enough for another, at `now`.
 pub fn check_due(saved: &Saved, now: u64) -> bool {
-    saved.answer.is_none() || now.saturating_sub(saved.checked) >= CHECK_EVERY.as_secs()
+    trusted(saved, now, seal::PUBLIC_KEY).is_none()
+        || now.saturating_sub(saved.checked) >= CHECK_EVERY.as_secs()
 }
 
 /// What the licence file every Mayorana app shares says. One plan unlocks
@@ -512,6 +572,156 @@ mod tests {
         assert_eq!(a.plan.name, "Studio");
         assert_eq!(a.credits.left, 380);
         assert_eq!(a.renewal(), "Ends on 2026-11-21");
+    }
+
+    // ── The signature ────────────────────────────────────────────────────
+
+    use seal::tests::{sealed, TEST_PUBLIC};
+    use seal::UNSIGNED_UNTIL;
+
+    /// After the rollout, when only a signed answer counts.
+    const LATER: u64 = UNSIGNED_UNTIL + 100 * DAY;
+
+    fn status(saved: &Saved, now: u64) -> Status {
+        status_with(Some(saved), now, ME, TEST_PUBLIC)
+    }
+
+    /// api0's signed answer, given and saved at `at`.
+    fn signed(products: &[&str], active: bool, at: u64) -> Saved {
+        let mut a = answer(products, active);
+        a.issued_at = at;
+        saved(sealed(&a), at)
+    }
+
+    #[test]
+    fn a_signed_answer_counts_and_is_read_from_what_was_signed() {
+        let s = signed(&[ME], true, LATER);
+        assert!(status(&s, LATER).is_pro());
+        assert!(status(&s, LATER + 7 * DAY).is_pro());
+        assert!(matches!(
+            status(&s, LATER + 7 * DAY + 1),
+            Status::Offline(_)
+        ));
+        // The plain fields beside `signed` are never what counts.
+        let mut edited = signed(&["gitagent"], true, LATER);
+        if let Some(a) = edited.answer.as_mut() {
+            a.products = vec!["*".into()];
+        }
+        assert!(matches!(status(&edited, LATER), Status::NotPro(_)));
+    }
+
+    #[test]
+    fn one_edited_byte_counts_as_no_answer() {
+        let s = signed(&[ME], false, LATER);
+        let a = s.answer.clone().unwrap();
+        for i in 0..a.signed.len() {
+            let mut bytes = a.signed.clone().into_bytes();
+            bytes[i] = if bytes[i] == b'0' { b'1' } else { b'0' };
+            let mut edited = s.clone();
+            edited.answer.as_mut().unwrap().signed = String::from_utf8(bytes).unwrap();
+            assert_eq!(
+                status(&edited, LATER),
+                Status::Unknown(s.licence.clone()),
+                "byte {i}"
+            );
+        }
+        // The signature edited, or made with another key: still none, even
+        // before the cut-off, as it isn't unsigned.
+        let mut bad = s.clone();
+        bad.answer
+            .as_mut()
+            .unwrap()
+            .signature
+            .replace_range(0..1, "A");
+        assert!(matches!(status(&bad, LATER), Status::Unknown(_)));
+        let foreign = status_with(Some(&s), 1_000 * DAY, ME, &seal::tests::other_public());
+        assert!(matches!(foreign, Status::Unknown(_)));
+    }
+
+    #[test]
+    fn a_missing_signature_counts_only_until_the_cut_off() {
+        let mut s = signed(&[ME], true, UNSIGNED_UNTIL - DAY);
+        s.answer.as_mut().unwrap().signature.clear();
+        assert!(status(&s, UNSIGNED_UNTIL - 1).is_pro());
+        assert_eq!(
+            status(&s, UNSIGNED_UNTIL),
+            Status::Unknown(s.licence.clone())
+        );
+        // An answer saved before api0 signed them: the same rule.
+        let old = saved(answer(&[ME], true), UNSIGNED_UNTIL - DAY);
+        assert!(status(&old, UNSIGNED_UNTIL - 1).is_pro());
+        assert!(!status(&old, UNSIGNED_UNTIL).is_pro());
+        // No answer means another check is due straight away.
+        assert!(!check_due(&old, UNSIGNED_UNTIL - 1));
+        assert!(check_due(&old, UNSIGNED_UNTIL));
+    }
+
+    #[test]
+    fn without_a_built_in_key_a_signed_answer_counts_as_unsigned() {
+        let s = signed(&[ME], true, UNSIGNED_UNTIL - DAY);
+        assert!(status_with(Some(&s), UNSIGNED_UNTIL - 1, ME, "").is_pro());
+        assert!(!status_with(Some(&s), UNSIGNED_UNTIL, ME, "").is_pro());
+    }
+
+    #[test]
+    fn editing_the_time_of_the_check_does_not_make_pro_last() {
+        let mut s = signed(&[ME], true, LATER);
+        s.checked = LATER + 30 * DAY;
+        assert!(matches!(status(&s, LATER + 8 * DAY), Status::Offline(_)));
+        // A computer whose clock is behind api0's counts from its own.
+        let mut behind = signed(&[ME], true, LATER);
+        behind.checked = LATER - DAY;
+        assert!(status(&behind, LATER + 5 * DAY).is_pro());
+    }
+
+    #[test]
+    fn a_signed_answer_about_another_licence_counts_as_none() {
+        let mut s = signed(&[ME], true, LATER);
+        s.licence = "BCDEF-GHJKL-MNPQR-STUVW".into();
+        assert!(matches!(status(&s, LATER), Status::Unknown(_)));
+    }
+
+    #[test]
+    fn a_saved_answer_is_checked_when_it_is_read_from_disk() {
+        let s = signed(&["gitagent"], true, LATER);
+        let mut edited = s.clone();
+        edited.answer.as_mut().unwrap().products = vec!["*".into()];
+        // Through the file and back: what is kept is what was signed.
+        let read = |s: &Saved| {
+            let text = serde_json::to_string(s).unwrap();
+            verified_with(serde_json::from_str(&text).unwrap(), LATER, TEST_PUBLIC)
+        };
+        let kept = read(&edited);
+        assert_eq!(
+            kept.answer.as_ref().map(|a| a.products.clone()),
+            Some(vec!["gitagent".to_string()])
+        );
+        assert_eq!(kept.checked, LATER);
+        // A broken signature: no answer, and not checked, so api0 is asked again.
+        edited.answer.as_mut().unwrap().signed.push(' ');
+        let dropped = read(&edited);
+        assert_eq!(dropped.answer, None);
+        assert_eq!(dropped.checked, 0);
+        assert!(check_due(&dropped, LATER));
+        assert_eq!(status(&dropped, LATER), Status::Unknown(s.licence));
+    }
+
+    #[test]
+    fn api0s_reply_counts_only_when_signed() {
+        let licence = "ABCDE-FGHJK-LMNPQ-RSTUV";
+        let mut a = answer(&[ME], true);
+        a.issued_at = LATER;
+        let reply = serde_json::to_string(&sealed(&a)).unwrap();
+        let read = read_answer(&reply, licence, LATER, TEST_PUBLIC).unwrap();
+        assert!(read.unlocks_for(ME));
+        assert_eq!(read.issued_at, LATER);
+        let tampered = reply.replacen("ABCDE", "ABCDF", 2);
+        assert!(read_answer(&tampered, licence, LATER, TEST_PUBLIC).is_err());
+        // The gateway before the signature: only until the cut-off.
+        let unsigned = serde_json::to_string(&a).unwrap();
+        assert!(read_answer(&unsigned, licence, UNSIGNED_UNTIL - 1, TEST_PUBLIC).is_ok());
+        assert!(read_answer(&unsigned, licence, UNSIGNED_UNTIL, TEST_PUBLIC).is_err());
+        assert!(read_answer("not json", licence, LATER, TEST_PUBLIC).is_err());
     }
 
     #[test]

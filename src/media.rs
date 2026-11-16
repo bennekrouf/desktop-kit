@@ -21,6 +21,15 @@ use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock, PoisonError};
+use std::time::Duration;
+
+/// The longest request or header line read, and how many header lines a request may have:
+/// any local program can connect, and must not be able to make the app hold all it sends.
+const MAX_LINE: u64 = 8 * 1024;
+const MAX_HEADERS: usize = 100;
+/// A connection that sends nothing for this long is closed. The web view opens a new one when
+/// it wants more.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
 struct Server {
     port: u16,
@@ -219,22 +228,29 @@ fn content_type(path: &Path) -> &'static str {
 /// Answer requests on one connection until the client closes it (or goes away mid-body,
 /// which the web view does whenever it has buffered enough).
 fn handle(stream: TcpStream) -> std::io::Result<()> {
+    stream.set_read_timeout(Some(IDLE_TIMEOUT))?;
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut out = stream;
     loop {
-        let mut request_line = String::new();
-        if reader.read_line(&mut request_line)? == 0 {
+        let Some(request_line) = read_line(&mut reader)? else {
             return Ok(());
-        }
+        };
         let mut range = None;
+        let mut headers = 0;
         loop {
-            let mut line = String::new();
-            if reader.read_line(&mut line)? == 0 {
+            let Some(line) = read_line(&mut reader)? else {
                 return Ok(());
-            }
+            };
             let line = line.trim_end();
             if line.is_empty() {
                 break;
+            }
+            headers += 1;
+            if headers > MAX_HEADERS {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "too many header lines",
+                ));
             }
             if let Some((name, value)) = line.split_once(':') {
                 if name.trim().eq_ignore_ascii_case("range") {
@@ -258,6 +274,22 @@ fn handle(stream: TcpStream) -> std::io::Result<()> {
             _ => status(&mut out, "404 Not Found")?,
         }
     }
+}
+
+/// One line of at most `MAX_LINE` bytes; `None` once the client has closed the connection.
+fn read_line(reader: &mut impl BufRead) -> std::io::Result<Option<String>> {
+    let mut line = String::new();
+    let n = reader.by_ref().take(MAX_LINE).read_line(&mut line)?;
+    if n == 0 {
+        return Ok(None);
+    }
+    if n as u64 == MAX_LINE && !line.ends_with('\n') {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "request line too long",
+        ));
+    }
+    Ok(Some(line))
 }
 
 fn status(out: &mut TcpStream, status: &str) -> std::io::Result<()> {
@@ -338,6 +370,39 @@ mod tests {
         assert_eq!(byte_range(Some("bytes=9-5"), 100), None);
         assert_eq!(byte_range(Some("items=0-1"), 100), None);
         assert_eq!(byte_range(Some("bytes=0-"), 0), None);
+    }
+
+    #[test]
+    fn lines_are_read_up_to_a_limit() {
+        let mut ok = std::io::Cursor::new(b"GET / HTTP/1.1\r\nHost: x\r\n".to_vec());
+        assert_eq!(
+            read_line(&mut ok).unwrap().as_deref(),
+            Some("GET / HTTP/1.1\r\n")
+        );
+        assert_eq!(read_line(&mut ok).unwrap().as_deref(), Some("Host: x\r\n"));
+        assert_eq!(read_line(&mut ok).unwrap(), None);
+
+        // A line that never ends stops at the limit instead of filling memory.
+        let mut endless = std::io::Read::take(std::io::repeat(b'a'), 1 << 30);
+        let mut reader = BufReader::new(&mut endless);
+        assert!(read_line(&mut reader).is_err());
+        assert!(
+            endless.limit() > (1 << 30) - 64 * 1024,
+            "read far past the limit"
+        );
+    }
+
+    #[test]
+    fn a_client_sending_endless_headers_is_dropped() {
+        // Headers are read before the file is looked up: no need to publish one (which would
+        // replace the file another test serves).
+        let mut s = TcpStream::connect(("127.0.0.1", server().unwrap().port)).unwrap();
+        s.set_write_timeout(Some(Duration::from_secs(5))).unwrap();
+        write!(s, "GET /x.mp4 HTTP/1.1\r\n").unwrap();
+        // The server closes the connection after MAX_HEADERS lines; writing then fails.
+        let line = "X-Filler: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n";
+        let refused = (0..200_000).any(|_| s.write_all(line.as_bytes()).is_err());
+        assert!(refused, "the server kept reading headers");
     }
 
     #[test]

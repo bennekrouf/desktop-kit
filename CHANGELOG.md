@@ -12,9 +12,25 @@ in the pull request that takes the change; this file is the kit's history.
 - The release workflow waits and tries the upload to mayorana.ch again when
   another app's release is uploading at the same moment, instead of failing:
   the server lets one upload in at a time.
+- The local media server reads at most 8 KiB per request line and 100 header
+  lines, and closes a connection that sends nothing for a minute. Any program
+  on the computer can connect to it, and could make the app hold everything it
+  sent.
+- api0's licence answer is signed, and the signature is checked whenever the
+  saved answer is read and whenever api0 sends one. Editing the saved file was
+  enough to show Pro. An answer with a missing or wrong signature counts as no
+  answer, so the app asks api0 again. Offline, Pro is counted from when api0
+  signed the answer, not from the time saved beside it. Unsigned answers still
+  count until 2027-02-01 (`licence::seal::UNSIGNED_UNTIL`), so nobody on Pro
+  loses it before the gateway that signs is deployed. `licence::seal::PUBLIC_KEY`
+  is empty until the production key pair is made. gateway-api0's
+  `LICENCE_SIGNING.md` says how, and what has to ship before that date.
 
 ### Added
 
+- `Answer::issued_at`, `Answer::signed` and `Answer::signature`, and
+  `licence::verified`, which keeps only the part of a saved licence whose
+  signature checks.
 - The pipeline calendar moves items: drag one to another day, or type its date
   with ✎ or a right-click. `library::set_date` keeps the new day; posts are
   refused, as their date is in their own file. `DragGhost` draws the card
