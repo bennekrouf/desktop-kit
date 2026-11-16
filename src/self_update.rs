@@ -73,9 +73,7 @@ pub fn installable(info: &UpdateInfo) -> bool {
 pub fn install(info: &UpdateInfo, progress: &dyn Fn(Stage)) -> Result<(), String> {
     let target = target(&info.download_url).ok_or("this copy can't update itself")?;
     let app = crate::app().ok_or("the app isn't named")?;
-    let dir = std::env::temp_dir().join(format!("{}-update-{}", app.id, info.latest_version));
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).map_err(|e| format!("couldn't make {}: {e}", dir.display()))?;
+    let dir = private_dir(&std::env::temp_dir(), app.id)?;
     let file = dir.join(file_name(&info.download_url));
 
     let prepared = download(&info.download_url, &file, app, progress)
@@ -101,6 +99,32 @@ pub fn install(info: &UpdateInfo, progress: &dyn Fn(Stage)) -> Result<(), String
             Err(e)
         }
     }
+}
+
+/// A new folder in `parent` for one install, that only this user can open.
+///
+/// Its name is random and it is made here, never adopted: on Linux the
+/// temporary folder is shared by everyone on the computer, and a folder
+/// another account had made first under a name it could guess would be theirs
+/// to change, between the digest check and the unpacking. Nothing from
+/// `latest.json` goes into the name either.
+fn private_dir(parent: &Path, id: &str) -> Result<PathBuf, String> {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    let mut last = String::new();
+    for _ in 0..4 {
+        let mut bytes = [0u8; 16];
+        getrandom::fill(&mut bytes).map_err(|e| format!("no random name to be had ({e})"))?;
+        let name: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        let dir = parent.join(format!("{id}-update-{name}"));
+        // Not `create_dir_all`: that one takes a folder that is already there.
+        match builder.create(&dir) {
+            Ok(()) => return Ok(dir),
+            Err(e) => last = format!("couldn't make {}: {e}", dir.display()),
+        }
+    }
+    Err(last)
 }
 
 /// Where the last attempt is written down: the version it went for, then the
@@ -775,6 +799,34 @@ mod tests {
         assert_eq!(check_digest(&file, &abc.to_uppercase()), Ok(()));
         assert!(check_digest(&file, &abc.replace('b', "c")).is_err());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The folder a download goes into is new, random and this user's alone:
+    /// on Linux the temporary folder is everyone's.
+    #[test]
+    fn the_download_folder_is_new_and_private() {
+        let parent = std::env::temp_dir().join(format!("kit-private-{}", std::process::id()));
+        fs::create_dir_all(&parent).unwrap();
+        let a = private_dir(&parent, "app").unwrap();
+        let b = private_dir(&parent, "app").unwrap();
+        assert_ne!(a, b);
+        for dir in [&a, &b] {
+            assert_eq!(dir.parent(), Some(parent.as_path()));
+            assert!(dir.is_dir());
+            let name = dir.file_name().unwrap().to_string_lossy().into_owned();
+            let random = name.strip_prefix("app-update-").unwrap();
+            assert_eq!(random.len(), 32, "{name}");
+            assert!(random.bytes().all(|b| b.is_ascii_hexdigit()), "{name}");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = fs::metadata(dir).unwrap().permissions().mode() & 0o777;
+                assert_eq!(mode, 0o700);
+            }
+        }
+        // Nowhere to make it: an error, not a folder somewhere else.
+        assert!(private_dir(&parent.join("missing"), "app").is_err());
+        let _ = fs::remove_dir_all(&parent);
     }
 
     #[test]

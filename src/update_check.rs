@@ -172,8 +172,22 @@ fn for_cpu<'a>(arch: &str, builds: &'a BTreeMap<String, Artifact>) -> Option<&'a
         })
 }
 
+/// Whether `s` is written like a version: letters, digits, `.`, `-` and `+`,
+/// and not long. `latest.json` is a remote file, and its version is shown in
+/// the banner and written down by the installer: one holding a path separator
+/// or anything else is not a version, whatever number it starts with.
+fn plain_version(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 64
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'+'))
+}
+
 pub(crate) fn is_newer(a: &str, b: &str) -> bool {
     let parse = |s: &str| -> Option<(u32, u32, u32)> {
+        if !plain_version(s) {
+            return None;
+        }
         let mut parts = s.trim_start_matches('v').split('.');
         let major = parts.next()?.parse().ok()?;
         let minor = parts.next()?.parse().ok()?;
@@ -209,6 +223,29 @@ mod tests {
         assert!(!is_newer("0.1.0", "0.1.0"));
         assert!(!is_newer("0.1.0-beta", "0.1.0"));
         assert!(!is_newer("garbage", "0.1.0"));
+    }
+
+    /// `latest.json` is a remote file. A version is shown in the banner and
+    /// written down by the installer, so one that is more than a version is
+    /// no release at all, however new the number it starts with.
+    #[test]
+    fn a_version_holding_anything_but_a_version_is_no_release() {
+        for version in [
+            "9.0.0-/../../victim",
+            "9.0.0-\\..\\victim",
+            "9.0.0 ",
+            "9.0.0-beta\n9.9.9",
+            "9.0.0-$(id)",
+            "",
+        ] {
+            assert!(!is_newer(version, "0.1.0"), "{version:?}");
+            let body = serde_json::json!({ "version": version }).to_string();
+            assert_eq!(newer_than(&body, "0.1.0", "macos", "aarch64", PAGE), None);
+        }
+        assert!(!is_newer(&format!("9.0.0-{}", "a".repeat(64)), "0.1.0"));
+        // What releases are really called still counts.
+        assert!(is_newer("9.0.0-rc.1+build5", "0.1.0"));
+        assert!(is_newer("v9.0.0", "0.1.0"));
     }
 
     #[test]
