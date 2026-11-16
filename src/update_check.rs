@@ -7,7 +7,7 @@
 //! the moment a repository stopped being publicly readable: the app should not
 //! depend on the source host to tell people a build exists.
 //!
-//! Setting `DISABLE_UPDATE_CHECK` turns it off. `MAYORANA_UPDATE_URL` replaces
+//! Setting `DISABLE_UPDATE_CHECK`, or the `DisableUpdateCheck` policy, turns it off. `MAYORANA_UPDATE_URL` replaces
 //! the address, to try a staging `latest.json` before it goes live.
 
 use serde::Deserialize;
@@ -62,7 +62,9 @@ pub struct UpdateInfo {
 /// `Some` if a newer release is published. Any network or parse failure is
 /// `None`, as is any call before [`crate::init`]. Never panics.
 pub async fn check() -> Option<UpdateInfo> {
-    if std::env::var_os("DISABLE_UPDATE_CHECK").is_some() {
+    if std::env::var_os("DISABLE_UPDATE_CHECK").is_some()
+        || crate::policy::get().disable_update_check
+    {
         return None;
     }
     let app = crate::app()?;

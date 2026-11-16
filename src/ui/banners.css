@@ -19,6 +19,7 @@
 .kit-banner + .kit-banner { border-top: 1px solid rgba(255, 255, 255, 0.25); }
 .kit-banner-text { flex: 1; min-width: 0; }
 .kit-banner-text strong { font-weight: 700; }
+.kit-banner-note { opacity: 0.75; font-size: 12.5px; white-space: nowrap; }
 .kit-banner-link {
     flex-shrink: 0;
     padding: 4px 10px; margin: 0;

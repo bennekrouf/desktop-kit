@@ -21,7 +21,8 @@
 //!     numbers);
 //!   * the person turned it off;
 //!   * `DISABLE_UPDATE_CHECK`, `DO_NOT_TRACK` or `MAYORANA_NO_TELEMETRY` is set,
-//!     in the app's environment or in the login shell's (see [`start`]).
+//!     in the app's environment or in the login shell's (see [`start`]);
+//!   * IT set the `DisableTelemetry` policy (see [`crate::policy`]).
 //!
 //! Best-effort throughout, like the update check: recording is a synchronous
 //! append that cannot fail visibly, sending has a two-second timeout, and a
@@ -268,17 +269,18 @@ fn flag_set(value: Option<&str>) -> bool {
 }
 
 fn env_blocks() -> bool {
-    opt_out_vars().iter().any(|name| {
-        let name = name.as_str();
-        let value = std::env::var(name).ok().or_else(|| login_env(name));
-        // DISABLE_UPDATE_CHECK is honoured by mere presence in the update check,
-        // so it is here too; the others follow the usual 0/false convention.
-        if name == "DISABLE_UPDATE_CHECK" {
-            value.is_some()
-        } else {
-            flag_set(value.as_deref())
-        }
-    })
+    crate::policy::get().disable_telemetry
+        || opt_out_vars().iter().any(|name| {
+            let name = name.as_str();
+            let value = std::env::var(name).ok().or_else(|| login_env(name));
+            // DISABLE_UPDATE_CHECK is honoured by mere presence in the update check,
+            // so it is here too; the others follow the usual 0/false convention.
+            if name == "DISABLE_UPDATE_CHECK" {
+                value.is_some()
+            } else {
+                flag_set(value.as_deref())
+            }
+        })
 }
 
 /// An explicit answer always wins. An unanswered question means

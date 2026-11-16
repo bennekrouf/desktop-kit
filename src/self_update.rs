@@ -58,7 +58,9 @@ pub enum Stage {
 /// Whether [`install`] can put `info`'s build in place on this computer. Cheap:
 /// no network, one file created and removed beside the app.
 pub fn installable(info: &UpdateInfo) -> bool {
-    !info.sha256.is_empty()
+    // IT deploys updates itself: the banner still says one is out.
+    !crate::policy::get().disable_self_update
+        && !info.sha256.is_empty()
         && crate::browser::is_web_url(&info.download_url)
         && info
             .download_url

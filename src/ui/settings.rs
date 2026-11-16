@@ -12,6 +12,7 @@ use super::{Theme, STYLE};
 pub fn SettingsGeneral(theme: Theme) -> Element {
     let (name, version) = crate::app().map_or(("", ""), |a| (a.name, a.version));
     let light = (theme.light)();
+    let managed = crate::policy::get().managed();
     let pick = move |want_light: bool| {
         if light != want_light {
             theme.toggle();
@@ -25,6 +26,17 @@ pub fn SettingsGeneral(theme: Theme) -> Element {
                 div { class: "kit-set-seg",
                     button { class: if light { "" } else { "kit-on" }, onclick: move |_| pick(false), "Dark" }
                     button { class: if light { "kit-on" } else { "" }, onclick: move |_| pick(true), "Light" }
+                }
+            }
+            if !managed.is_empty() {
+                div { class: "kit-set-row kit-set-managed",
+                    span { class: "kit-set-label", "{crate::policy::MANAGED}" }
+                    span { class: "kit-set-muted",
+                        for (i, line) in managed.iter().enumerate() {
+                            if i > 0 { br {} }
+                            "{line}"
+                        }
+                    }
                 }
             }
             if !version.is_empty() {

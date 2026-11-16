@@ -357,8 +357,12 @@ pub fn shared_from(text: &str) -> Shared {
     normalise(text).map_or(Shared::Removed, Shared::Licence)
 }
 
-/// What the shared file says now.
+/// What the shared file says now, unless IT set the number for the machine
+/// (see [`crate::policy`]): that one wins.
 pub fn load_shared() -> Shared {
+    if let Some(licence) = &crate::policy::get().licence {
+        return Shared::Licence(licence.clone());
+    }
     let Some(path) = shared_path() else {
         return Shared::Missing;
     };
