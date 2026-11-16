@@ -15,6 +15,8 @@
 //! * [`library`]: the media library and pipeline statuses the apps share,
 //!   with [`handoff`] notes from one app to another and [`launch`] to open
 //!   them and the person's files;
+//! * [`policy`]: what a company's IT department set for every machine
+//!   (updates, usage statistics, the licence number);
 //! * [`region`]: the AI regions api0 offers, with their flags;
 //! * [`ui`] (with the `ui` feature): the header, the banners under it and the
 //!   Pro window every app shows.
@@ -35,6 +37,7 @@ pub mod mcp;
 #[cfg(feature = "media")]
 pub mod media;
 pub mod notice;
+pub mod policy;
 pub mod region;
 pub mod self_update;
 pub mod shell;

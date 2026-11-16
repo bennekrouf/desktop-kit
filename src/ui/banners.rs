@@ -165,7 +165,13 @@ pub fn Banners(
                         // One button. A copy that can't replace itself (a
                         // `cargo` build, a folder that isn't the person's)
                         // gets the build in the browser instead.
-                        if installable() {
+                        if crate::policy::get().disable_self_update {
+                            span {
+                                class: "kit-banner-note",
+                                title: "{crate::policy::MANAGED}",
+                                "Your organization installs updates."
+                            }
+                        } else if installable() {
                             button {
                                 class: "kit-banner-link",
                                 title: "Download {info.latest_version}, check it, install it in place of this version and restart {name}",

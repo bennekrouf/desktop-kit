@@ -58,7 +58,9 @@ pub enum Stage {
 /// Whether [`install`] can put `info`'s build in place on this computer. Cheap:
 /// no network, one file created and removed beside the app.
 pub fn installable(info: &UpdateInfo) -> bool {
-    !info.sha256.is_empty()
+    // IT deploys updates itself: the banner still says one is out.
+    !crate::policy::get().disable_self_update
+        && !info.sha256.is_empty()
         && crate::browser::is_web_url(&info.download_url)
         && info
             .download_url
@@ -109,6 +111,8 @@ pub fn install(info: &UpdateInfo, progress: &dyn Fn(Stage)) -> Result<(), String
 /// to change, between the digest check and the unpacking. Nothing from
 /// `latest.json` goes into the name either.
 fn private_dir(parent: &Path, id: &str) -> Result<PathBuf, String> {
+    // Only Unix sets a mode on it; elsewhere it is never changed.
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut builder = fs::DirBuilder::new();
     #[cfg(unix)]
     std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);

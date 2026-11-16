@@ -7,6 +7,16 @@ in the pull request that takes the change; this file is the kit's history.
 
 ## [Unreleased]
 
+### Added
+
+- The shared release workflow also builds, signs and publishes
+  `installer/<app>.wxs` as `<app>.msi`, beside the setup .exe.
+- Company policies in the Windows registry, under
+  `HKLM\SOFTWARE\Policies\Mayorana` (every app) or `...\Mayorana\<App>`
+  (one app), and the same under HKCU: `DisableUpdateCheck`,
+  `DisableSelfUpdate` and `DisableTelemetry` (REG_DWORD 1), and `Licence`
+  (REG_SZ), the number every user of the machine gets.
+
 ### Fixed
 
 - Install & restart no longer builds a folder name out of the version in
@@ -33,9 +43,10 @@ in the pull request that takes the change; this file is the kit's history.
   answer, so the app asks api0 again. Offline, Pro is counted from when api0
   signed the answer, not from the time saved beside it. Unsigned answers still
   count until 2027-02-01 (`licence::seal::UNSIGNED_UNTIL`), so nobody on Pro
-  loses it before the gateway that signs is deployed. `licence::seal::PUBLIC_KEY`
-  is empty until the production key pair is made. gateway-api0's
-  `LICENCE_SIGNING.md` says how, and what has to ship before that date.
+  loses it before the gateway that signs is deployed.
+  `licence::seal::PUBLIC_KEY` is empty until the production key pair is made.
+  gateway-api0's `LICENCE_SIGNING.md` says how, and what has to ship before that
+  date.
 
 ### Added
 

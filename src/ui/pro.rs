@@ -353,7 +353,13 @@ pub fn ProWindow(
                                 "Check again"
                             }
                         }
-                        if status.licence().is_some() {
+                        if status.licence().is_some() && crate::policy::get().licence.is_some() {
+                            span {
+                                class: "kit-pro-hint",
+                                title: "Set by your IT department for everyone on this computer",
+                                "{crate::policy::MANAGED}"
+                            }
+                        } else if status.licence().is_some() {
                             button {
                                 class: "kit-pro-btn",
                                 title: "Removes it from every Mayorana app on this computer, to move it to another one",
