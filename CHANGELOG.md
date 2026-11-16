@@ -9,6 +9,17 @@ in the pull request that takes the change; this file is the kit's history.
 
 ### Fixed
 
+- Install & restart no longer builds a folder name out of the version in
+  `latest.json`. A version written as a path (`9.0.0-/../../Documents`)
+  passed for a newer release, and the installer then downloaded into that
+  folder and deleted it when the install failed. A version holding anything
+  but letters, digits, `.`, `-` and `+` is now no release at all, and the
+  download folder's name is random.
+- On Linux, Install & restart downloads into a folder only this user can
+  open, made new each time. The temporary folder is shared by every account
+  on the computer, and the old folder's name could be guessed: another
+  account that made it first could swap the download after its digest was
+  checked, and Linux builds carry no signature to catch that.
 - The release workflow waits and tries the upload to mayorana.ch again when
   another app's release is uploading at the same moment, instead of failing:
   the server lets one upload in at a time.
