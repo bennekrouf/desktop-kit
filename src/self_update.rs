@@ -111,6 +111,8 @@ pub fn install(info: &UpdateInfo, progress: &dyn Fn(Stage)) -> Result<(), String
 /// to change, between the digest check and the unpacking. Nothing from
 /// `latest.json` goes into the name either.
 fn private_dir(parent: &Path, id: &str) -> Result<PathBuf, String> {
+    // Only Unix sets a mode on it; elsewhere it is never changed.
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut builder = fs::DirBuilder::new();
     #[cfg(unix)]
     std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
