@@ -11,8 +11,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::Deserialize;
 
 use super::{
-    check_due, free_reply, load_shared, normalise, plausible_email, reconcile, Answer, FreeError,
-    Saved, Shared, Status, GATEWAY,
+    check_due, free_reply, load_shared, normalise, plausible_email, read_answer, reconcile, seal,
+    verified, Answer, FreeError, Saved, Shared, Status, GATEWAY,
 };
 use crate::http::{self, Method};
 
@@ -42,9 +42,11 @@ fn save_shared(text: &str) {
     super::save_shared(text, product());
 }
 
+/// This app's saved licence, with api0's last answer only if its signature
+/// checks.
 fn load_own() -> Option<Saved> {
     let text = std::fs::read_to_string(file()?).ok()?;
-    serde_json::from_str(&text).ok()
+    Some(verified(serde_json::from_str(&text).ok()?, now()))
 }
 
 /// The app's saved licence and api0's last answer, brought in line with the
@@ -130,8 +132,10 @@ async fn ask(licence: &str) -> Result<Answer, CheckError> {
         .await
         .ok_or_else(|| CheckError::Unreachable("api0 couldn't be reached".into()))?;
     match response.status {
-        200 => serde_json::from_str(&response.body)
-            .map_err(|_| CheckError::Unreachable("api0's answer couldn't be read".into())),
+        // Unsigned, or signed by anyone else: as if api0 couldn't be
+        // reached, so the last answer stands.
+        200 => read_answer(&response.body, licence, now(), seal::PUBLIC_KEY)
+            .map_err(CheckError::Unreachable),
         401 => Err(CheckError::Unknown),
         code => Err(CheckError::Unreachable(format!("api0 answered {code}"))),
     }

@@ -18,6 +18,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The digest of a downloaded update, checked before it is installed.
 sha2 = "0.10"
+# The signature on api0's licence answer, checked whenever it is read.
+ed25519-dalek = "2.2"
 tokio = { version = "1", features = ["rt", "sync", "time", "io-std", "io-util"] }
 # Only with the `ui` feature: the header every app shows.
 dioxus = { version = "=0.7.10", default-features = false, features = ["macro", "html", "signals", "hooks", "document"], optional = true }
