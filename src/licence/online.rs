@@ -213,11 +213,24 @@ pub async fn portal_url(licence: &str) -> Result<String, String> {
         .await
         .ok_or_else(|| fail("api0 couldn't be reached".into()))?;
     if !(200..300).contains(&response.status) {
-        return Err(fail(format!("api0 answered {}", response.status)));
+        return Err(portal_refusal(response.status, &response.body)
+            .unwrap_or_else(|| fail(format!("api0 answered {}", response.status))));
     }
     serde_json::from_str::<Portal>(&response.body)
         .map(|p| p.url)
         .map_err(|_| fail("api0's answer couldn't be read".into()))
+}
+
+/// What to say when api0 knows the licence but there is no subscription page
+/// behind it: one granted by hand, or the free allowance, has nothing to
+/// change or cancel.
+fn portal_refusal(status: u16, body: &str) -> Option<String> {
+    let code = serde_json::from_str::<serde_json::Value>(body).ok()?["error"]["code"]
+        .as_str()?
+        .to_owned();
+    (status == 404 && code == "no_subscription").then(|| {
+        "This licence wasn't bought on mayorana.ch, so there's no subscription to change or cancel.".into()
+    })
 }
 
 /// Asks api0 to email `email` a licence for the free allowance of AI credits.
@@ -253,4 +266,24 @@ pub fn deactivate() {
         let _ = std::fs::remove_file(path);
     }
     save_shared("");
+}
+
+#[cfg(test)]
+mod portal_tests {
+    use super::portal_refusal;
+
+    #[test]
+    fn a_licence_without_a_subscription_says_so() {
+        let body = r#"{"error":{"message":"No subscription to manage","type":"no_subscription","code":"no_subscription"}}"#;
+        assert!(portal_refusal(404, body)
+            .unwrap()
+            .contains("no subscription to change"));
+    }
+
+    #[test]
+    fn other_refusals_keep_api0s_status() {
+        let unknown = r#"{"error":{"message":"Unknown licence","type":"invalid_api_key","code":"invalid_api_key"}}"#;
+        assert_eq!(portal_refusal(401, unknown), None);
+        assert_eq!(portal_refusal(404, "not json"), None);
+    }
 }
