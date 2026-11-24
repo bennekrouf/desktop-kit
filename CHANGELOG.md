@@ -9,6 +9,19 @@ in the pull request that takes the change; this file is the kit's history.
 
 ### Added
 
+- The "Use it from Claude or Codex" window installs the app's MCP server
+  instead of explaining how: for Claude Desktop, Claude Code, Codex and VS Code
+  it shows whether the server is installed and running, with Install, Update
+  (when it starts another copy of the app) and Uninstall, and a Test that starts
+  the server as a client does. The steps by hand stay, folded. It says that
+  ChatGPT in the browser can't use it, as it did of Claude. `ConnectWindow`
+  takes the same properties as before.
+- `mcp::clients`, which does it. Claude Code and Codex through their own
+  commands; Claude Desktop and VS Code by editing only the app's entry in their
+  file, after a copy to `<file>.mayorana.bak`. A file that is not plain JSON is
+  left alone, and Claude Desktop is never changed while it is open: it would
+  write its old configuration back. serde_json's `raw_value` feature is on, so
+  the rest of the file keeps its order and its text.
 - The shared release workflow also builds, signs and publishes
   `installer/<app>.wxs` as `<app>.msi`, beside the setup .exe.
 - Company policies in the Windows registry, under

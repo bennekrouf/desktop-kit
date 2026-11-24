@@ -11,6 +11,10 @@
 //!
 //! An app that serves the media library ([`Server::library`]) gets its tools
 //! and instructions added after its own, and its calls answered first.
+//!
+//! [`clients`] adds the server to Claude, Codex and VS Code.
+
+pub mod clients;
 
 use serde_json::{json, Value};
 use std::future::Future;
