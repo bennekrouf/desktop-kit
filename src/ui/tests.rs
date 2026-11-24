@@ -304,6 +304,7 @@ fn the_connect_window_gives_every_client_its_step_and_the_app_its_words() {
         "Ask: “What is new?”",
         "Your things go to the model.",
         "claude.ai",
+        "chatgpt.com",
     ] {
         assert!(html.contains(text), "missing {text:?} in {html}");
     }

@@ -15,7 +15,8 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dirs = "6"
 getrandom = "0.3"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# `raw_value` edits a client's config file without rewriting the rest of it.
+serde_json = { version = "1", features = ["raw_value"] }
 # The digest of a downloaded update, checked before it is installed.
 sha2 = "0.10"
 # The signature on api0's licence answer, checked whenever it is read.
